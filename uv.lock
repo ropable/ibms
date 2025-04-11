@@ -91,14 +91,14 @@ wheels = [
 
 [[package]]
 name = "dbca-utils"
-version = "2.0.3"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/92/b23ab24a12274e6d1e37dfc665741536ef3305874df9e0aa02d84134ec2b/dbca_utils-2.0.3.tar.gz", hash = "sha256:a5d0eb14f75509ca78690985785f6a467c1733ea7e6ba86f495aa5626f755e0b", size = 9540 }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/a3/d21001c060f1203b07ab7e116f52ae2d2afbd6dc0c7c86e7c739198ca2a2/dbca_utils-2.1.1.tar.gz", hash = "sha256:f44c8f2e1d53f6aab3f18baa676e518503f01c13ed900264394c47c6e2034e71", size = 13569 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/08/6fd046200e1922061b44408051be753a175a740b609c3fab0225b5448519/dbca_utils-2.0.3-py3-none-any.whl", hash = "sha256:8159238fc6d6abe3d0b645bc17fc39866272533e2689b3512367792b5ceda959", size = 10487 },
+    { url = "https://files.pythonhosted.org/packages/69/ca/671fdb6c285e3b3f0d51eb956a3793072c11862da4d55b8dad81e5ee55fe/dbca_utils-2.1.1-py3-none-any.whl", hash = "sha256:5fb17a3941d053787d88fdb30f15635b5162865e2355761b9e8aae76c2c31d78", size = 11188 },
 ]
 
 [[package]]
@@ -134,16 +134,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "4.2.20"
+version = "5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/dd/33d2a11713f6b78493273a32d99bb449f2d93663ed4ec15a8b890d44ba04/Django-4.2.20.tar.gz", hash = "sha256:92bac5b4432a64532abb73b2ac27203f485e40225d2640a7fbef2b62b876e789", size = 10432686 }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/1b/c6da718c65228eb3a7ff7ba6a32d8e80fa840ca9057490504e099e4dd1ef/Django-5.2.tar.gz", hash = "sha256:1a47f7a7a3d43ce64570d350e008d2949abe8c7e21737b351b6a1611277c6d89", size = 10824891 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/5d/7571ba1c288ead056dda7adad46b25cbf64790576f095565282e996138b1/Django-4.2.20-py3-none-any.whl", hash = "sha256:213381b6e4405f5c8703fffc29cd719efdf189dec60c67c04f76272b3dc845b9", size = 7993584 },
+    { url = "https://files.pythonhosted.org/packages/63/e0/6a5b5ea350c5bd63fe94b05e4c146c18facb51229d9dee42aa39f9fc2214/Django-5.2-py3-none-any.whl", hash = "sha256:91ceed4e3a6db5aedced65e3c8f963118ea9ba753fc620831c77074e620e7d83", size = 8301361 },
 ]
 
 [[package]]
@@ -245,6 +245,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "ipdb" },
     { name = "ipython" },
     { name = "mixer" },
     { name = "pre-commit" },
@@ -253,9 +254,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "crispy-bootstrap5", specifier = "==2025.4" },
-    { name = "dbca-utils", specifier = "==2.0.3" },
+    { name = "dbca-utils", specifier = "==2.1.1" },
     { name = "dj-database-url", specifier = "==2.3.0" },
-    { name = "django", specifier = "==4.2.20" },
+    { name = "django", specifier = "==5.2" },
     { name = "django-crispy-forms", specifier = "==2.3" },
     { name = "django-extensions", specifier = "==3.2.3" },
     { name = "gunicorn", specifier = "==23.0.0" },
@@ -271,6 +272,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "ipdb", specifier = ">=0.13.13" },
     { name = "ipython", specifier = ">=8.31.0" },
     { name = "mixer", specifier = ">=7.2.2" },
     { name = "pre-commit", specifier = ">=4.0.1" },
@@ -283,6 +285,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/82/bf/c68c46601bacd4c6fb4dd751a42b6e7087240eaabc6487f2ef7a48e0e8fc/identify-2.6.6.tar.gz", hash = "sha256:7bec12768ed44ea4761efb47806f0a41f86e7c0a5fdf5950d4648c90eca7e251", size = 99217 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/74/a1/68a395c17eeefb04917034bd0a1bfa765e7654fa150cca473d669aa3afb5/identify-2.6.6-py2.py3-none-any.whl", hash = "sha256:cbd1810bce79f8b671ecb20f53ee0ae8e86ae84b557de31d89709dc2a48ba881", size = 99083 },
+]
+
+[[package]]
+name = "ipdb"
+version = "0.13.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "decorator" },
+    { name = "ipython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/1b/7e07e7b752017f7693a0f4d41c13e5ca29ce8cbcfdcc1fd6c4ad8c0a27a0/ipdb-0.13.13.tar.gz", hash = "sha256:e3ac6018ef05126d442af680aad863006ec19d02290561ac88b8b1c0b0cfc726", size = 17042 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/4c/b075da0092003d9a55cf2ecc1cae9384a1ca4f650d51b00fc59875fe76f6/ipdb-0.13.13-py3-none-any.whl", hash = "sha256:45529994741c4ab6d2388bfa5d7b725c2cf7fe9deffabdb8a6113aa5ed449ed4", size = 12130 },
 ]
 
 [[package]]
