@@ -45,7 +45,7 @@ class IbmsViewsTest(IbmsTestCase):
         self.assertTemplateUsed(response, "login.html")
         self.client.login(username="admin", password="test")
         url = reverse("logout")
-        response = self.client.get(url)
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "logged_out.html")
 
