@@ -52,6 +52,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "dbca_utils.middleware.SSOLoginMiddleware",
@@ -81,7 +82,9 @@ TEMPLATES = [
 ]
 SITE_TITLE = "Integrated Business Management System"
 SITE_ACRONYM = "IBMS"
-project = tomllib.load(open(os.path.join(BASE_DIR, "pyproject.toml"), "rb"))
+pyproject_toml = open(os.path.join(BASE_DIR, "pyproject.toml"), "rb")
+project = tomllib.load(pyproject_toml)
+pyproject_toml.close()
 APPLICATION_VERSION_NO = project["project"]["version"]
 MANAGERS = (
     ("Zen Wee", "zen.wee@dbca.wa.gov.au", "9219 9928"),
@@ -102,9 +105,12 @@ SHAREPOINT_IBMS = env("SHAREPOINT_IBMS", "")
 
 
 # Database configuration
+default_database = dj_database_url.config()
+# Make use of PostgreSQL connection pool support.
+if "postgresql" in default_database["ENGINE"]:
+    default_database["OPTIONS"] = {"pool": True}
 DATABASES = {
-    # Defined in DATABASE_URL env variable.
-    "default": dj_database_url.config(),
+    "default": default_database,
 }
 
 
