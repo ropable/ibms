@@ -14,7 +14,7 @@ dependencies = [
   "gunicorn==25.1.0",
   "django-extensions==4.1",
   "django-crispy-forms==2.5",
-  "crispy-bootstrap5==2025.6",
+  "crispy-bootstrap5==2026.3",
   "webtemplate-dbca==1.8.3",
   "whitenoise[brotli]==6.11.0",
   "openpyxl==3.1.5",
