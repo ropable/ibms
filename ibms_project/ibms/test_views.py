@@ -62,29 +62,26 @@ class IbmsViewsTest(IbmsTestCase):
 
     def test_superuser_views_redirect(self):
         """Test superuser-only views redirects normal users"""
+        self.client.logout()
+        self.client.login(username="testuser", password="test")
         for view in [
             "upload",
             "download_dept_program",
             "code_update_admin",
+            "clearglpivot",
         ]:
             url = reverse(f"ibms:{view}")
             response = self.client.get(url)
             self.assertEqual(response.status_code, 302)
 
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.client.login(username="admin", password="test")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
     def test_superuser_views_get(self):
         """Test superuser-only views load"""
-        self.client.logout()
         self.client.login(username="admin", password="test")
         for view in [
             "upload",
             "download_dept_program",
             "code_update_admin",
+            "clearglpivot",
         ]:
             url = reverse(f"ibms:{view}")
             response = self.client.get(url)
@@ -154,24 +151,6 @@ class IbmsViewsTest(IbmsTestCase):
             )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(DepartmentProgram.objects.count(), 4)
-
-    def test_clearglpivot_view_redirect(self):
-        """Test clearglpivot view redirects normal users, but not superusers."""
-        url = reverse("ibms:clearglpivot")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.client.login(username="admin", password="test")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_code_update_admin_view_redirect(self):
-        """Test code_update_admin view redirects normal users, but not superusers."""
-        url = reverse("ibms:code_update_admin")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.client.login(username="admin", password="test")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
 
     def test_ibms_admin_views(self):
         """Test that the Django ibms app admin works"""
