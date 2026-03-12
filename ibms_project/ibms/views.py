@@ -9,7 +9,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
-from django.views.generic import ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import BaseDetailView
 from django.views.generic.edit import FormMixin, FormView
 from reversion import set_comment
@@ -18,7 +18,15 @@ from sfm.models import FinancialYear
 from xlrd import open_workbook
 from xlutils.copy import copy as copy_xl
 
-from ibms.forms import ClearGLPivotForm, DownloadForm, IbmDataFilterForm, IbmDataForm, ManagerCodeUpdateForm, UploadForm
+from ibms.forms import (
+    ClearGLPivotForm,
+    CodeUpdateCreateForm,
+    DownloadForm,
+    IbmDataFilterForm,
+    IbmDataForm,
+    ManagerCodeUpdateForm,
+    UploadForm,
+)
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
@@ -609,4 +617,59 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         obj = self.get_object()
         messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
         set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
+        return super().form_valid(form)
+
+
+class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
+    """A form to allow users to manually generate an IBMData object via a form."""
+
+    model = IBMData
+    form_class = CodeUpdateCreateForm
+    http_method_names = ["get", "post", "head", "options"]
+    template_name = "ibms/code_update_create.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.user.is_superuser:
+            context["superuser"] = True
+        context["download_period"] = get_download_period()
+        context["page_title"] = f"{settings.SITE_ACRONYM} | Code update"
+        context["title"] = "CODE UPDATE"
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+
+        # Always provide a default FY.
+        if "financial_year" not in self.request.GET:
+            fy = FinancialYear.objects.order_by("-financialYear").first()
+            kwargs["initial"]["financial_year"] = fy.financialYear
+
+        return kwargs
+
+    def form_invalid(self, form):
+        # Provide some extra context on the rendered view to assist with GUI behaviour.
+        context = self.get_context_data(form=form)
+        context["form_invalid"] = True
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        # Override a couple of form field values on save.
+        new_ibmdata = form.save(commit=False)
+
+        # Uppercase the activity, project and job fields.
+        new_ibmdata.activity = new_ibmdata.activity.upper()
+        new_ibmdata.project = new_ibmdata.project.upper()
+        new_ibmdata.job = new_ibmdata.job.upper()
+        # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
+        new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
+
+        # Short-circuit: if a matching IBMData record exists, return to that object view instead.
+        if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
+            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
+            messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
+            return redirect(existing_ibmdata.get_absolute_url())
+
+        new_ibmdata.save()
+        messages.success(self.request, f"IBM data {new_ibmdata} has been created")
         return super().form_valid(form)

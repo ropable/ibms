@@ -1,6 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Layout, Submit
 from django import forms
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from sfm.models import FinancialYear
 
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
@@ -648,3 +649,104 @@ class IbmDataForm(forms.ModelForm):
             "regionDescription",
         ]
         exclude = ["id"]
+
+
+class CodeUpdateCreateForm(forms.ModelForm):
+    fy = forms.ModelChoiceField(
+        queryset=None,
+        empty_label=None,
+        required=True,
+        disabled=True,
+        label="Financial year",
+    )
+    costCentre = forms.ChoiceField(choices=[("", "--------")], required=True, label="Cost centre")
+    save_button = Submit("save", "Save", css_class="btn-lg")
+    cancel_button = Submit("cancel", "Cancel", css_class="btn-secondary")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Take the existing model form fields and apply the required restrictions and validation rules.
+        fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
+        cost_centres = IBMData.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        self.fields["fy"].queryset = FinancialYear.objects.filter(financialYear=kwargs["initial"]["financial_year"])
+        self.fields["fy"].initial = fy
+        self.fields["costCentre"].choices += sorted([(i, i) for i in cost_centres])
+        self.fields["account"].required = True
+        self.fields["account"].validators = [
+            MaxValueValidator(limit_value=99, message="Account value maximum is 99."),
+            MinValueValidator(limit_value=0, message="Account value minimum is 00."),
+        ]
+        self.fields["account"].widget.attrs.update({"min": 0, "max": 99})
+        self.fields["account"].help_text = "Numeric integer, maximum 99."
+        self.fields["service"].required = True
+        self.fields["service"].validators = [
+            MaxValueValidator(limit_value=99, message="Service value maximum is 99."),
+            MinValueValidator(limit_value=0, message="Service value minimum is 00."),
+        ]
+        self.fields["service"].widget.attrs.update({"min": 0, "max": 99})
+        self.fields["service"].help_text = "Numeric integer, maximum 99."
+        self.fields["activity"].required = True
+        self.fields["activity"].help_text = "Two letters followed by one number or letter."
+        self.fields["activity"].validators = [
+            RegexValidator(
+                regex=r"^[A-Za-z]{2}[A-Za-z0-9]$", message="Activity value must be two letters followed by one number or letter."
+            )
+        ]
+        self.fields["activity"].widget.attrs.update({"placeholder": "---"})
+        self.fields["activity"].widget.attrs.update({"maxlength": "3"})
+        self.fields["activity"].widget.attrs.update({"pattern": "[A-Za-z]{2}[A-Za-z0-9]"})
+        self.fields["project"].required = True
+        self.fields["project"].help_text = "Four characters, alphanumeric."
+        self.fields["project"].validators = [
+            RegexValidator(regex=r"^[A-Za-z0-9]{4}$", message="Project value must be four alphanumeric characters.")
+        ]
+        self.fields["project"].widget.attrs.update({"placeholder": "----"})
+        self.fields["project"].widget.attrs.update({"maxlength": "4"})
+        self.fields["project"].widget.attrs.update({"pattern": "[A-Za-z0-9]{4}"})
+        self.fields["job"].required = True
+        self.fields["job"].help_text = "Three characters, alphanumeric."
+        self.fields["job"].validators = [
+            RegexValidator(regex=r"^[A-Za-z0-9]{3}$", message="Job value must be three alphanumeric characters.")
+        ]
+        self.fields["job"].widget.attrs.update({"placeholder": "---"})
+        self.fields["job"].widget.attrs.update({"maxlength": "3"})
+        self.fields["job"].widget.attrs.update({"pattern": "[A-za-z0-9]{3}"})
+
+        # crispy_forms layout
+        self.helper = FormHelper()
+        self.helper.form_class = "form-horizontal"
+        self.helper.label_class = "col-xs-12 col-sm-4 col-md-2"
+        self.helper.field_class = "col-xs-12 col-sm-8 col-md-10"
+        self.helper.help_text_inline = True
+        self.helper.layout = Layout(
+            "fy",
+            "costCentre",
+            "account",
+            "service",
+            "activity",
+            "project",
+            "job",
+            Div(self.save_button, self.cancel_button, css_class="col-sm-offset-4 col-md-offset-3 col-lg-offset-2"),
+        )
+
+    class Meta:
+        model = IBMData
+        fields = [
+            "fy",
+            "costCentre",
+            "account",
+            "service",
+            "activity",
+            "project",
+            "job",
+        ]
+        exclude = ["id"]
+
+    def clean(self):
+        # Business rule: users may not input activity DJ0.
+        if "activity" in self.cleaned_data and self.cleaned_data["activity"].lower() == "dj0":
+            self._errors["activity"] = self.error_class(
+                ["IBMS information for activity DJ0 (Bushfire) is system generated, not available for user input."]
+            )
+
+        return self.cleaned_data
