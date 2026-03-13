@@ -1,6 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Layout, Submit
 from django import forms
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from sfm.models import FinancialYear
 
@@ -95,6 +96,8 @@ class UploadForm(FinancialYearFilterForm):
         upload = self.cleaned_data.get("upload_file")
         if upload and upload.content_type not in ["text/plain", "text/csv", "application/vnd.ms-excel"]:
             self._errors["upload_file"] = self.error_class(["File type is not allowed (.csv only)"])
+        if upload and upload.size > settings.MAX_UPLOAD_SIZE:
+            self._errors["upload_file"] = self.error_class([f"File exceeds maximum size of {settings.MAX_UPLOAD_SIZE} bytes"])
         return self.cleaned_data
 
 

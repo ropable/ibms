@@ -5,6 +5,7 @@ import tempfile
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import connection
 from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -67,11 +68,11 @@ class ClearGLPivotView(IbmsFormView):
 
     form_class = ClearGLPivotForm
 
-    def get(self, request, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         if not request.user.is_superuser:
             messages.error(self.request, "You are not authorised to carry out this operation")
             return redirect(self.get_success_url())
-        return super().get(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -83,18 +84,17 @@ class ClearGLPivotView(IbmsFormView):
         return reverse("site_home")
 
     def form_valid(self, form):
-        if not self.request.user.is_superuser:
-            messages.error(self.request, "You are not authorised to carry out this operation.")
-            return self.get_success_url()
         if self.request.POST.get("cancel"):
             return redirect(self.get_success_url())
-        # Do the bulk delete. We can use the private method _raw_delete because we don't
-        # have any signals or cascade deletes to worry about.
+
+        # Do the bulk delete as a raw SQL query, for performance.
         fy = form.cleaned_data["financial_year"]
-        glpiv = GLPivDownload.objects.filter(fy=fy)
-        if glpiv.exists():
-            glpiv._raw_delete(glpiv.db)
-            messages.success(self.request, f"GL Pivot entries for {fy} have been cleared.")
+        count = GLPivDownload.objects.filter(fy=fy).count()
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM ibms_glpivdownload WHERE fy_id = %s", [fy.financialYear])
+
+        messages.success(self.request, f"Deleted {count} GL Pivot entries for {fy}")
+
         return super().form_valid(form)
 
 
@@ -123,36 +123,38 @@ class UploadView(RevisionMixin, IbmsFormView):
         # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
         # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
         # in a consistent fashion.
-        t = tempfile.NamedTemporaryFile()
-        for chunk in form.cleaned_data["upload_file"].chunks():
-            t.write(chunk.decode("utf-8", "ignore").encode())
-        t.flush()
-        # We have to open the uploaded file in text mode to parse it.
-        file = open(t.name, "r")
-        file_type = form.cleaned_data["upload_file_type"]
+        with tempfile.NamedTemporaryFile(mode="w+b", delete=True) as t:
+            for chunk in form.cleaned_data["upload_file"].chunks():
+                t.write(chunk.decode("utf-8", "ignore").encode())
+            t.flush()
 
-        # Catch exception thrown by the upload validation process and display it to the user.
-        try:
-            upload_valid = validate_upload_file(file, file_type)
-        except Exception as e:
-            messages.warning(self.request, f"Error: {str(e)}")
-            return super().form_invalid(form)
+            with open(t.name, "r") as file:
+                # process file
+                file = open(t.name, "r")
+                file_type = form.cleaned_data["upload_file_type"]
 
-        # Upload may still not be valid, but at least no exception was thrown.
-        if upload_valid:
-            fy = form.cleaned_data["financial_year"]
-            try:
-                data_type = process_upload_file(file.name, file_type, fy)
-                messages.success(self.request, f"{data_type} data imported successfully")
-            except Exception as e:
-                messages.warning(self.request, f"Error: {str(e)}")
-        else:
-            messages.warning(
-                self.request,
-                f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
-            )
+                # Catch exception thrown by the upload validation process and display it to the user.
+                try:
+                    upload_valid = validate_upload_file(file, file_type)
+                except Exception as e:
+                    messages.warning(self.request, f"Error: {str(e)}")
+                    return super().form_invalid(form)
 
-        return super().form_valid(form)
+                # Upload may still not be valid, but at least no exception was thrown.
+                if upload_valid:
+                    fy = form.cleaned_data["financial_year"]
+                    try:
+                        data_type = process_upload_file(file.name, file_type, fy)
+                        messages.success(self.request, f"{data_type} data imported successfully")
+                    except Exception as e:
+                        messages.warning(self.request, f"Error: {str(e)}")
+                else:
+                    messages.warning(
+                        self.request,
+                        f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
+                    )
+
+                return super().form_valid(form)
 
 
 class DownloadView(IbmsFormView):
@@ -365,7 +367,11 @@ class JSONResponseMixin(object):
 
     def get_json_response(self, content, **httpresponse_kwargs):
         "Construct an `HttpResponse` object."
-        return HttpResponse(content, content_type="application/json", **httpresponse_kwargs)
+        response = HttpResponse(content, content_type="application/json", **httpresponse_kwargs)
+        # Include CSP headers in response.
+        response["X-Content-Type-Options"] = "nosniff"
+        response["X-Frame-Options"] = "DENY"
+        return response
 
     def convert_context_to_json(self, context):
         "Convert the context dictionary into a JSON object"
@@ -421,8 +427,11 @@ class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
     def get(self, request, *args, **kwargs):
         # Sanity check: if the model hasn't got that field, return a
         # HTTPResponseBadRequest response.
-        if not hasattr(self.model, self.fieldname):
+        try:
+            self.model._meta.get_field(self.fieldname)
+        except FieldDoesNotExist:
             return HttpResponseBadRequest(f"Invalid field name: {self.fieldname}")
+
         qs = self.model.objects.all()
         if request.GET.get("financialYear", None):
             qs = qs.filter(fy__financialYear=request.GET["financialYear"])
@@ -554,35 +563,69 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
 
         # Cost centre
         if self.request.GET.get("cost_centre", None):
-            qs = qs.filter(costCentre=self.request.GET["cost_centre"])
+            # Validate the cost_centre value that was passed in.
+            cost_centre = self.request.GET["cost_centre"]
+            valid_cc_set = set(IBMData.objects.values_list("costCentre", flat=True))
+            if cost_centre not in valid_cc_set:
+                raise ValueError("Invalid cost centre")
+            qs = qs.filter(costCentre=cost_centre)
 
         # Region/branch
         if self.request.GET.get("region", None):
             # As regionBranch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
             # then use those values to filter the IBMData queryset.
+            # Validate the region_branch value that was passed in.
             region_branch = self.request.GET["region"]
+            valid_region_set = set(IBMData.objects.values_list("regionBranch", flat=True))
+            if region_branch not in valid_region_set:
+                raise ValueError("Invalid region or branch")
             cost_centres = set(GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True))
             qs = qs.filter(costCentre__in=cost_centres)
 
         # Service
         if self.request.GET.get("service", None):
-            qs = qs.filter(service=self.request.GET["service"])
+            # Validate the service value that was passed in.
+            service = self.request.GET["service"]
+            valid_service_set = set(IBMData.objects.values_list("service", flat=True))
+            if service not in valid_service_set:
+                raise ValueError("Invalid service")
+            qs = qs.filter(service=service)
 
         # Project
         if self.request.GET.get("project", None):
-            qs = qs.filter(project=self.request.GET["project"])
+            # Validate the project value that was passed in.
+            project = self.request.GET["project"]
+            valid_project_set = set(IBMData.objects.values_list("project", flat=True))
+            if project not in valid_project_set:
+                raise ValueError("Invalid project")
+            qs = qs.filter(project=project)
 
         # Job
         if self.request.GET.get("job", None):
-            qs = qs.filter(job=self.request.GET["job"])
+            # Validate the job value that was passed in.
+            job = self.request.GET["job"]
+            valid_job_set = set(IBMData.objects.values_list("job", flat=True))
+            if job not in valid_job_set:
+                raise ValueError("Invalid job")
+            qs = qs.filter(job=job)
 
         # Budget area
         if self.request.GET.get("budget_area", None):
-            qs = qs.filter(budgetArea=self.request.GET["budget_area"])
+            # Validate the budget_area value that was passed in.
+            budget_area = self.request.GET["budget_area"]
+            valid_budget_set = set(IBMData.objects.values_list("budgetArea", flat=True))
+            if budget_area not in valid_budget_set:
+                raise ValueError("Invalid budget area")
+            qs = qs.filter(budgetArea=budget_area)
 
         # Project sponsor
         if self.request.GET.get("project_sponsor", None):
-            qs = qs.filter(projectSponsor=self.request.GET["project_sponsor"])
+            # Validate the project_sponsor value that was passed in.
+            project_sponsor = self.request.GET["project_sponsor"]
+            valid_sponsor_set = set(IBMData.objects.values_list("projectSponsor", flat=True))
+            if project_sponsor not in valid_sponsor_set:
+                raise ValueError("Invalid project sponsor")
+            qs = qs.filter(projectSponsor=project_sponsor)
 
         return qs.order_by("ibmIdentifier")
 

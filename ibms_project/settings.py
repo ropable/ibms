@@ -112,6 +112,7 @@ IBM_DATA_AMEND_URI = env("IBM_DATA_AMEND_URI", "")
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None  # Required to allow end-of-month GLPivot bulk deletes.
 CSV_FILE_LIMIT = env("CSV_FILE_LIMIT", 100000000)
 SHAREPOINT_IBMS = env("SHAREPOINT_IBMS", "")
+MAX_UPLOAD_SIZE = env("MAX_UPLOAD_SIZE", 100000000)  # 100MB
 
 
 # Database configuration
