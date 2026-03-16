@@ -419,7 +419,7 @@ class NCStrategicPlanAdmin(ModelAdmin):
     ]
     readonly_fields = ["fy", "strategicPlanNo"]
     list_filter = ["fy__financialYear"]
-    list_display = ["strategicPlanNo", "fy", "directionNo", "direction"]
+    list_display = ["fy", "strategicPlanNo", "directionNo", "direction"]
     search_fields = ["strategicPlanNo", "direction"]
     actions = [
         export_as_csv_action(

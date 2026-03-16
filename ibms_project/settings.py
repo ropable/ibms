@@ -6,6 +6,7 @@ from pathlib import Path
 import dj_database_url
 from dbca_utils.utils import env
 
+# Project paths
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = str(Path(__file__).resolve().parents[1])
 PROJECT_DIR = str(Path(__file__).resolve().parents[0])
@@ -110,7 +111,7 @@ IBM_SERVICE_PRIORITY_URI = env("IBM_SERVICE_PRIORITY_URI", "")
 IBM_RELOAD_URI = env("IBM_RELOAD_URI", "")
 IBM_DATA_AMEND_URI = env("IBM_DATA_AMEND_URI", "")
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None  # Required to allow end-of-month GLPivot bulk deletes.
-CSV_FILE_LIMIT = env("CSV_FILE_LIMIT", 100000000)
+CSV_FILE_LIMIT = env("CSV_FILE_LIMIT", 100000000)  # 100MB
 SHAREPOINT_IBMS = env("SHAREPOINT_IBMS", "")
 MAX_UPLOAD_SIZE = env("MAX_UPLOAD_SIZE", 100000000)  # 100MB
 
