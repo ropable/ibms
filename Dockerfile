@@ -11,11 +11,14 @@ RUN uv sync --no-group dev --link-mode=copy --compile-bytecode --no-python-downl
   && rm -rf /bin/uv \
   && rm uv.lock
 
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Copy the remaining project files to finish building the project
 COPY gunicorn.py manage.py ./
 COPY ibms_project ./ibms_project
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/app/.venv/bin:$PATH"
+COPY ibms ./ibms
+COPY sfm ./sfm
 # Compile scripts and collect static files
 RUN python -m compileall ibms_project \
   && python manage.py collectstatic --noinput
