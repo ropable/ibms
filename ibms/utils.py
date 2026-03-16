@@ -1,8 +1,9 @@
 import codecs
 import csv
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Literal
 
-import xlwt
 from django.conf import settings
 from reversion import create_revision, set_comment
 
@@ -21,6 +22,18 @@ from ibms.models import (
 )
 
 
+class IBMSValidationError(Exception):
+    """Base validation error for IBMS data import"""
+
+    pass
+
+
+class FieldLengthError(IBMSValidationError):
+    """Field exceeds maximum length"""
+
+    pass
+
+
 def get_download_period():
     """Return the 'newest' download_period date value for all the GLPivDownload objects."""
     if not GLPivDownload.objects.exists():
@@ -33,163 +46,162 @@ def get_download_period():
 def validate_char_field(field_name, max_length, data):
     """For a passed-in string value, validate it doesn't exceed a maximum length."""
     if len(data.strip()) > max_length:
-        raise Exception(f"Field {field_name} exceeds maximum length of {max_length}")
+        raise FieldLengthError(f"Record for field {field_name} exceeds maximum length of {max_length}: got {data}")
     return data.strip()
 
 
-def csvload(file_name):
+def validate_integer_field(field_name, data):
+    """Validate field is an integer"""
+    try:
+        return int(str(data).strip())
+    except (ValueError, TypeError):
+        raise IBMSValidationError(f"Record for field {field_name} must be an integer, got: {data}")
+
+
+@contextmanager
+def csvload_context(file_name):
+    """For a passed-in CSV file path, returns a reader instance having context on the underlying file
+    sufficient to close the file after processing via a `with` statement.
+    """
     csvfile = codecs.open(file_name, encoding="utf-8", errors="ignore")
     csv.field_size_limit(settings.CSV_FILE_LIMIT)
-    reader = csv.reader(csvfile, dialect="excel", quotechar=str('"'))
-    if not csv.Sniffer().has_header(csvfile.readline()):
-        reader.seek(0)
-    return reader, csvfile, file_name
-
-
-def save_record(model, data, query):
-    # Query the database for an existing object based on ``query``, and update it with ``data``.
-    # Alternatively, just create a new object with ``data``.
-    if model.objects.filter(**query).exists():
-        # We won't bother raising an exception if there are multiple rows returned by the filter().
-        # We'll rely on any natural keys defined on the model to maintain database integrity.
-        obj = model.objects.filter(**query).update(**data)
-    else:
-        obj = model(**data)
-        obj.save()
-
-    return obj
+    try:
+        reader = csv.reader(csvfile, dialect="excel")
+        if not csv.Sniffer().has_header(sample=csvfile.readline()):
+            reader.seek(0)
+        yield reader
+    finally:
+        csvfile.close()
 
 
 def import_to_ibmdata(file_name, fy):
     """Utility function to import data from the uploaded CSV to the IBMData table."""
-    reader, csvfile, file_name = csvload(file_name)
-
-    for row in reader:
-        data = {
-            "fy": fy,
-            "ibmIdentifier": validate_char_field("ibmIdentifier", 50, row[0]),
-            "costCentre": validate_char_field("costCentre", 4, row[1]),
-            "account": row[2],
-            "service": row[3],
-            "activity": validate_char_field("activity", 4, row[4]),
-            "project": validate_char_field("project", 6, row[5]),
-            "job": validate_char_field("job", 6, row[6]),
-            "budgetArea": validate_char_field("budgetArea", 50, row[7]),
-            "projectSponsor": validate_char_field("projectSponsor", 50, str(row[8])),
-            "regionalSpecificInfo": row[9],
-            "servicePriorityID": validate_char_field("servicePriorityID", 100, row[10]),
-            "annualWPInfo": str(row[11]),
-            "priorityActionNo": str(row[12]),
-            "priorityLevel": str(row[13]),
-            "marineKPI": str(row[14]),
-            "regionProject": str(row[15]),
-            "regionDescription": str(row[16]),
-        }
-        with create_revision():
-            if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0])).exists():
-                ibmdata = IBMData.objects.get(fy=fy, ibmIdentifier=str(row[0]))
-                ibmdata.costCentre = row[1]
-                ibmdata.account = row[2]
-                ibmdata.service = row[3]
-                ibmdata.activity = row[4]
-                ibmdata.project = row[5]
-                ibmdata.job = row[6]
-                ibmdata.budgetArea = row[7]
-                ibmdata.projectSponsor = row[8]
-                ibmdata.regionalSpecificInfo = row[9]
-                ibmdata.servicePriorityID = row[10]
-                ibmdata.annualWPInfo = row[11]
-                ibmdata.priorityActionNo = row[12]
-                ibmdata.priorityLevel = row[13]
-                ibmdata.marineKPI = row[14]
-                ibmdata.regionProject = row[15]
-                ibmdata.regionDescription = row[16]
-                ibmdata.save()
-                set_comment(f"{ibmdata} amended via upload")
-            else:
-                ibmdata = IBMData(**data)
-                ibmdata.save()
-                # Repeat the save, in order to try setting the service priority on the object.
-                # We can't set this before having a PK on the object.
-                if not ibmdata.service_priority:
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "ibmIdentifier": validate_char_field("ibmIdentifier", 50, row[0]),
+                "costCentre": validate_char_field("costCentre", 4, row[1]),
+                "account": validate_integer_field("account", row[2]),
+                "service": validate_integer_field("service", row[3]),
+                "activity": validate_char_field("activity", 4, row[4]),
+                "project": validate_char_field("project", 6, row[5]),
+                "job": validate_char_field("job", 6, row[6]),
+                "budgetArea": validate_char_field("budgetArea", 50, row[7]),
+                "projectSponsor": validate_char_field("projectSponsor", 50, str(row[8])),
+                "regionalSpecificInfo": row[9],
+                "servicePriorityID": validate_char_field("servicePriorityID", 100, row[10]),
+                "annualWPInfo": str(row[11]),
+                "priorityActionNo": str(row[12]),
+                "priorityLevel": str(row[13]),
+                "marineKPI": str(row[14]),
+                "regionProject": str(row[15]),
+                "regionDescription": str(row[16]),
+            }
+            with create_revision():
+                if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0])).exists():
+                    ibmdata = IBMData.objects.get(fy=fy, ibmIdentifier=str(row[0]))
+                    ibmdata.costCentre = row[1]
+                    ibmdata.account = row[2]
+                    ibmdata.service = row[3]
+                    ibmdata.activity = row[4]
+                    ibmdata.project = row[5]
+                    ibmdata.job = row[6]
+                    ibmdata.budgetArea = row[7]
+                    ibmdata.projectSponsor = row[8]
+                    ibmdata.regionalSpecificInfo = row[9]
+                    ibmdata.servicePriorityID = row[10]
+                    ibmdata.annualWPInfo = row[11]
+                    ibmdata.priorityActionNo = row[12]
+                    ibmdata.priorityLevel = row[13]
+                    ibmdata.marineKPI = row[14]
+                    ibmdata.regionProject = row[15]
+                    ibmdata.regionDescription = row[16]
                     ibmdata.save()
+                    set_comment(f"{ibmdata} amended via upload")
+                else:
+                    ibmdata = IBMData(**data)
+                    ibmdata.save()
+                    # Repeat the save, in order to try setting the service priority on the object.
+                    # We can't set this before having a PK on the object.
+                    if not ibmdata.service_priority:
+                        ibmdata.save()
 
-        # Check for any existing GLPivDownload objects that should now link to this object.
-        for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
-            glpiv.save()
+            # Check for any existing GLPivDownload objects that should now link to this object.
+            for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
+                glpiv.save()
 
-    csvfile.close()
-    return "IBM Data"
-
-
-def import_to_glpivotdownload(file_name, fy):
-    reader, _, file_name = csvload(file_name)
-    for row in reader:
-        try:
-            download_period = datetime.strptime(row[0], "%d/%m/%Y")
-        except ValueError:
-            download_period = None
-        # NOTE: we can't use bulk_create here because it doesn't set the object FK links.
-        _ = GLPivDownload.objects.create(
-            fy=fy,
-            download_period=download_period,
-            downloadPeriod=row[0],
-            costCentre=row[1],
-            account=row[2],
-            service=row[3],
-            activity=row[4],
-            resource=row[5],
-            project=row[6],
-            job=row[7],
-            shortCode=row[8],
-            shortCodeName=row[9],
-            gLCode=row[10],
-            ptdActual=row[11],
-            ptdBudget=row[12],
-            ytdActual=row[13],
-            ytdBudget=row[14],
-            fybudget=row[15],
-            ytdVariance=row[16],
-            ccName=row[17],
-            serviceName=row[18],
-            activityName=row[19],
-            resourceName=row[20],
-            projectName=row[21],
-            jobName=row[22],
-            codeID=row[23],
-            resNameNo=row[24],
-            actNameNo=row[25],
-            projNameNo=row[26],
-            regionBranch=row[27],
-            division=row[28],
-            resourceCategory=row[29],
-            wildfire=row[30],
-            expenseRevenue=row[31],
-            fireActivities=row[32],
-            mPRACategory=row[33],
-        )
-    return "GL Pivot Download"
+        return "IBM Data"
 
 
-def import_to_corporate_strategy(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "corporateStrategyNo": validate_char_field("corporateStrategyNo", 10, row[0]),
-            "description1": str(row[1]),
-            "description2": str(row[2]),
-        }
-        query = {"fy": fy, "corporateStrategyNo": str(row[0])}
-        save_record(CorporateStrategy, data, query)
-    file.close()
-    return "IBMS Corporate strategy"
+def import_to_glpivotdownload(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the GLPivDownload table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            try:
+                download_period = datetime.strptime(row[0], "%d/%m/%Y")
+            except ValueError:
+                download_period = None
+            # NOTE: we can't use bulk_create here because it doesn't set the object FK links.
+            _ = GLPivDownload.objects.create(
+                fy=fy,
+                download_period=download_period,
+                downloadPeriod=row[0],
+                costCentre=row[1],
+                account=row[2],
+                service=row[3],
+                activity=row[4],
+                resource=row[5],
+                project=row[6],
+                job=row[7],
+                shortCode=row[8],
+                shortCodeName=row[9],
+                gLCode=row[10],
+                ptdActual=row[11],
+                ptdBudget=row[12],
+                ytdActual=row[13],
+                ytdBudget=row[14],
+                fybudget=row[15],
+                ytdVariance=row[16],
+                ccName=row[17],
+                serviceName=row[18],
+                activityName=row[19],
+                resourceName=row[20],
+                projectName=row[21],
+                jobName=row[22],
+                codeID=row[23],
+                resNameNo=row[24],
+                actNameNo=row[25],
+                projNameNo=row[26],
+                regionBranch=row[27],
+                division=row[28],
+                resourceCategory=row[29],
+                wildfire=row[30],
+                expenseRevenue=row[31],
+                fireActivities=row[32],
+                mPRACategory=row[33],
+            )
+        return "GL Pivot Download"
 
 
-def import_to_nc_strategic_plan(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    i = 1
-    try:
+def import_to_corporate_strategy(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the CorporateStrategy table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "corporateStrategyNo": validate_char_field("corporateStrategyNo", 10, row[0]),
+                "description1": str(row[1]),
+                "description2": str(row[2]),
+            }
+            query = {"fy": fy, "corporateStrategyNo": str(row[0])}
+            _, _ = CorporateStrategy.objects.update_or_create(defaults=data, **query)
+        return "IBMS Corporate strategy"
+
+
+def import_to_nc_strategic_plan(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the NCStrategicPlan table."""
+    with csvload_context(file_name) as reader:
         for row in reader:
             data = {
                 "fy": fy,
@@ -203,361 +215,156 @@ def import_to_nc_strategic_plan(file_name, fy):
                 "action": str(row[7]),
             }
             query = {"fy": fy, "strategicPlanNo": str(row[0])}
-            save_record(NCStrategicPlan, data, query)
-            i += 1
-
-        file.close()
-    except NCServicePriority.DoesNotExist:
-        file.close()
-        raise Exception(
-            f"Row {i}:{row[0]}\nPlease import NC Service Priority data before proceeding, otherwise database integrity will be compromised."
-        )
-    return "Nature Conservation Strategic Plan"
+            _, _ = NCStrategicPlan.objects.update_or_create(defaults=data, **query)
+    return "Nature Conservation"
 
 
-def import_to_pvs_service_priority(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "categoryID": validate_char_field("categoryID", 30, row[0]),
-            "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
-            "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
-            "corporateStrategyNo": row[3],
-            "servicePriority1": str(row[4]),
-            "description": str(row[5]),
-            "pvsExampleAnnWP": str(row[6]),
-            "pvsExampleActNo": str(row[7]),
-        }
-
-        query = {"fy": fy, "servicePriorityNo": str(row[1])}
-        save_record(PVSServicePriority, data, query)
-
-    file.close()
+def import_to_pvs_service_priority(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the PVSServicePriority table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "categoryID": validate_char_field("categoryID", 30, row[0]),
+                "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
+                "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
+                "corporateStrategyNo": row[3],
+                "servicePriority1": str(row[4]),
+                "description": str(row[5]),
+                "pvsExampleAnnWP": str(row[6]),
+                "pvsExampleActNo": str(row[7]),
+            }
+            query = {"fy": fy, "servicePriorityNo": str(row[1])}
+            _, _ = PVSServicePriority.objects.update_or_create(defaults=data, **query)
     return "Parks & Visitor Services Service priority"
 
 
-def import_to_sfm_service_priority(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "categoryID": validate_char_field("categoryID", 30, row[0]),
-            "regionBranch": validate_char_field("regionBranch", 20, row[1]),
-            "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2]),
-            "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[3]),
-            "corporateStrategyNo": row[4],
-            "description": str(row[5]),
-            "description2": str(row[6]),
-        }
-        query = {"fy": fy, "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2])}
-        save_record(SFMServicePriority, data, query)
-
-    file.close()
+def import_to_sfm_service_priority(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the SFMServicePriority table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "categoryID": validate_char_field("categoryID", 30, row[0]),
+                "regionBranch": validate_char_field("regionBranch", 20, row[1]),
+                "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2]),
+                "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[3]),
+                "corporateStrategyNo": row[4],
+                "description": str(row[5]),
+                "description2": str(row[6]),
+            }
+            query = {"fy": fy, "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2])}
+            _, _ = SFMServicePriority.objects.update_or_create(defaults=data, **query)
     return "Forest Management Service Priority"
 
 
-def import_to_er_service_priority(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "categoryID": validate_char_field("categoryID", 30, row[0]),
-            "servicePriorityNo": validate_char_field("servicePriorityNo", 10, row[1]),
-            "strategicPlanNo": validate_char_field("strategicPlanNo", 10, row[2]),
-            "corporateStrategyNo": row[3],
-            "classification": str(row[4]),
-            "description": str(row[5]),
-        }
-        query = {"fy": fy, "servicePriorityNo": str(row[1])}
-        save_record(ERServicePriority, data, query)
-
-    file.close()
+def import_to_er_service_priority(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the ERServicePriority table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "categoryID": validate_char_field("categoryID", 30, row[0]),
+                "servicePriorityNo": validate_char_field("servicePriorityNo", 10, row[1]),
+                "strategicPlanNo": validate_char_field("strategicPlanNo", 10, row[2]),
+                "corporateStrategyNo": row[3],
+                "classification": str(row[4]),
+                "description": str(row[5]),
+            }
+            query = {"fy": fy, "servicePriorityNo": str(row[1])}
+            _, _ = ERServicePriority.objects.update_or_create(defaults=data, **query)
     return "Fire Services Service Priority"
 
 
-def import_to_general_service_priority(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "categoryID": validate_char_field("categoryID", 30, row[0]),
-            "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[1]),
-            "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[2]),
-            "corporateStrategyNo": row[3],
-            "description": str(row[4]),
-            "description2": str(row[5]),
-        }
-        query = {"fy": fy, "servicePriorityNo": str(row[1])}
+def import_to_general_service_priority(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the GeneralServicePriority table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "categoryID": validate_char_field("categoryID", 30, row[0]),
+                "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[1]),
+                "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[2]),
+                "corporateStrategyNo": row[3],
+                "description": str(row[4]),
+                "description2": str(row[5]),
+            }
+            query = {"fy": fy, "servicePriorityNo": str(row[1])}
 
-        save_record(GeneralServicePriority, data, query)
-
-    file.close()
+            _, _ = GeneralServicePriority.objects.update_or_create(defaults=data, **query)
     return "General Service Priority"
 
 
-def import_to_nc_service_priority(file_name, fy):
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "categoryID": validate_char_field("categoryID", 30, row[0]),
-            "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
-            "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
-            "corporateStrategyNo": validate_char_field("corporateStrategyNo", 100, row[3]),
-            "assetNo": validate_char_field("AssetNo", 5, row[4]),
-            "asset": str(row[5]),
-            "targetNo": validate_char_field("Asset", 30, row[6]),
-            "target": str(row[7]),
-            "actionNo": str(row[8]),
-            "action": str(row[9]),
-            "mileNo": validate_char_field("MileNo", 30, row[10]),
-            "milestone": str(row[11]),
-        }
-        query = {"fy": fy, "servicePriorityNo": str(row[1])}
-        save_record(NCServicePriority, data, query)
-
-    file.close()
+def import_to_nc_service_priority(file_name, fy) -> str:
+    """Utility function to import data from the uploaded CSV to the NCServicePriority table."""
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "categoryID": validate_char_field("categoryID", 30, row[0]),
+                "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
+                "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
+                "corporateStrategyNo": validate_char_field("corporateStrategyNo", 100, row[3]),
+                "assetNo": validate_char_field("AssetNo", 5, row[4]),
+                "asset": str(row[5]),
+                "targetNo": validate_char_field("Asset", 30, row[6]),
+                "target": str(row[7]),
+                "actionNo": str(row[8]),
+                "action": str(row[9]),
+                "mileNo": validate_char_field("MileNo", 30, row[10]),
+                "milestone": str(row[11]),
+            }
+            query = {"fy": fy, "servicePriorityNo": str(row[1])}
+            _, _ = NCServicePriority.objects.update_or_create(defaults=data, **query)
     return "Nature Conservation Service Priority"
 
 
-def import_to_service_priority_mappings(file_name, fy):
-    reader, file, file_name = csvload(file_name)
+def import_to_service_priority_mappings(file_name, fy) -> str:
+    """Utility function to replace data from the uploaded CSV to the ServicePriorityMapping table."""
+    # First, delete any existing records.
     query_results = ServicePriorityMapping.objects.filter(fy=fy)
     if query_results.exists():
         query_results.delete()
-    for row in reader:
-        data = {
-            "fy": fy,
-            "costCentreNo": validate_char_field("costCentreNo", 4, row[0]),
-            "wildlifeManagement": validate_char_field("wildlifeManagement", 100, row[1]),
-            "parksManagement": validate_char_field("parksManagement", 100, row[2]),
-            "forestManagement": validate_char_field("forestManagement", 100, row[3]),
-        }
-        obj = ServicePriorityMapping(**data)
-        obj.save()
-
-    file.close()
+    # Import the CSV data.
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "costCentreNo": validate_char_field("costCentreNo", 4, row[0]),
+                "wildlifeManagement": validate_char_field("wildlifeManagement", 100, row[1]),
+                "parksManagement": validate_char_field("parksManagement", 100, row[2]),
+                "forestManagement": validate_char_field("forestManagement", 100, row[3]),
+            }
+            obj = ServicePriorityMapping(**data)
+            obj.save()
     return "Service Priority Mapping"
 
 
-def import_dept_program(file_name, fy):
+def import_dept_program(file_name, fy) -> str:
     """Function to generate DepartmentProgram records from the passed-in CSV and financial year.
     Validates import data per row (safe to throw exception midway through iterator).
     """
-    reader, file, file_name = csvload(file_name)
-    for row in reader:
-        data = {
-            "fy": fy,
-            "ibmIdentifier": validate_char_field("ibmIdentifier", 100, row[0]),
-            "dept_program1": validate_char_field("DeptProgram1", 500, row[1]),
-            "dept_program2": validate_char_field("DeptProgram2", 500, row[2]),
-            "dept_program3": validate_char_field("DeptProgram3", 500, row[3]),
-        }
-        query = {"fy": fy, "ibmIdentifier": str(row[0])}
-        department_program = save_record(DepartmentProgram, data, query)
+    with csvload_context(file_name) as reader:
+        for row in reader:
+            data = {
+                "fy": fy,
+                "ibmIdentifier": validate_char_field("ibmIdentifier", 100, row[0]),
+                "dept_program1": validate_char_field("DeptProgram1", 500, row[1]),
+                "dept_program2": validate_char_field("DeptProgram2", 500, row[2]),
+                "dept_program3": validate_char_field("DeptProgram3", 500, row[3]),
+            }
+            query = {"fy": fy, "ibmIdentifier": str(row[0])}
+            department_program, _ = DepartmentProgram.objects.update_or_create(defaults=data, **query)
 
-        # Filter any GLPivDownload objects that should be linked to this object
-        for gl in GLPivDownload.objects.filter(fy=fy, codeID=department_program.ibmIdentifier, department_program__isnull=True):
-            gl.save()  # Sets the FK link on save.
-
-    file.close()
+            # Filter any GLPivDownload objects that should be linked to this object
+            for gl in GLPivDownload.objects.filter(fy=fy, codeID=department_program.ibmIdentifier, department_program__isnull=True):
+                gl.save()  # Sets the FK link on save.
     return "Department Program"
 
 
-def download_ibms_data(glrows):
-    rows = glrows.values(
-        "codeID",
-        "fy",
-        "downloadPeriod",
-        "costCentre",
-        "account",
-        "service",
-        "activity",
-        "resource",
-        "project",
-        "job",
-        "shortCode",
-        "shortCodeName",
-        "gLCode",
-        "ptdActual",
-        "ptdBudget",
-        "ytdActual",
-        "ytdBudget",
-        "fybudget",
-        "ytdVariance",
-        "ccName",
-        "serviceName",
-        "jobName",
-        "resNameNo",
-        "actNameNo",
-        "projNameNo",
-        "regionBranch",
-        "division",
-        "resourceCategory",
-        "wildfire",
-        "expenseRevenue",
-        "fireActivities",
-        "mPRACategory",
-    )
-
-    ibmrows = IBMData.objects.values(
-        "ibmIdentifier",
-        "fy",
-        "budgetArea",
-        "projectSponsor",
-        "regionalSpecificInfo",
-        "servicePriorityID",
-        "annualWPInfo",
-    )
-    ibmdict = dict(((r["ibmIdentifier"] + "_" + r["fy"], r) for r in ibmrows))
-    spdict = dict()
-    ncsprows = NCServicePriority.objects.values_list("servicePriorityNo", "fy", "action", "milestone")
-    sfmsprows = SFMServicePriority.objects.values_list("servicePriorityNo", "fy", "description", "description2")
-    pvssprows = PVSServicePriority.objects.values_list("servicePriorityNo", "fy", "servicePriority1", "description")
-    gensprows = GeneralServicePriority.objects.values_list("servicePriorityNo", "fy", "description", "description2")
-    ersprows = ERServicePriority.objects.values_list("servicePriorityNo", "fy", "classification", "description")
-
-    # order important
-    for sprows in [ncsprows, sfmsprows, pvssprows, gensprows, ersprows]:
-        spdict.update(dict(((r[0] + "_" + r[1], r) for r in sprows)))
-
-    book = xlwt.Workbook()
-    sheet = book.add_sheet("Sheet 1")
-    headers = [
-        "IBMS ID",
-        "Financial Year",
-        "Download Period",
-        "Cost Centre",
-        "Account",
-        "Service",
-        "Activity",
-        "Resource",
-        "Project",
-        "Job",
-        "Short Code",
-        "Short Code Name",
-        "GL Code",
-        "ptd Actual",
-        "ptd Budget",
-        "ytd Actual",
-        "ytd Budget",
-        "fy Budget",
-        "ytd Variance",
-        "cc Name",
-        "Service Name",
-        "Job Name",
-        "Res Name No",
-        "Act Name No",
-        "Proj Name No",
-        "Region/Branch",
-        "Division",
-        "Resource Category",
-        "Wildfire",
-        "Expense Revenue",
-        "Fire Activities",
-        "mPRACategory",
-        "Budget Area",
-        "Project Sponsor",
-        "Corporate Strategy No",
-        "Strategic Plan No",
-        "Regional Specific Info",
-        "Service Priority No",
-        "Annual Works Plan",
-        "Corp Strategy Description 1",
-        "Corp Strategy Description 2",
-        "Nat Cons Strategic Direction No",
-        "Nat Cons Strat Direction Desc",
-        "Nat Cons Strat Plan Aim No",
-        "Nat Cons Strat Plan Aim Desc 1",
-        "Nat Cons Strat Plan Aim Desc 2",
-        "Nat Cons Strat Plan Action No",
-        "Nat Cons Strat Plan Action Description",
-        "Service Priority Description 1",
-        "Service Priority Description 2",
-    ]
-
-    for col, h in enumerate(headers):
-        sheet.write(0, col, h)
-
-    for row_num, row in enumerate(rows, 1):
-        outputdict = row
-        outputdict.update(ibmdict.get(row["codeID"] + "_" + row["fy"], dict()))
-        if "servicePriorityID" in outputdict.keys():
-            d1, d2 = spdict.get(outputdict["servicePriorityID"] + "_" + row["fy"], ("", "", "", ""))[2:]
-            outputdict.update({"d1": d1, "d2": d2})
-        xlrow = list()
-        for key in [
-            "codeID",
-            "fy",
-            "downloadPeriod",
-            "costCentre",
-            "account",
-            "service",
-            "activity",
-            "resource",
-            "project",
-            "job",
-            "shortCode",
-            "shortCodeName",
-            "gLCode",
-            "ptdActual",
-            "ptdBudget",
-            "ytdActual",
-            "ytdBudget",
-            "fybudget",
-            "ytdVariance",
-            "ccName",
-            "serviceName",
-            "jobName",
-            "resNameNo",
-            "actNameNo",
-            "projNameNo",
-            "regionBranch",
-            "division",
-            "resourceCategory",
-            "wildfire",
-            "expenseRevenue",
-            "fireActivities",
-            "mPRACategory",
-            "budgetArea",
-            "projectSponsor",
-            "regionalSpecificInfo",
-            "servicePriorityID",
-            "annualWPInfo",
-            "description1",
-            "description2",
-            "directionNo",
-            "direction",
-            "aimNo",
-            "aim1",
-            "aim2",
-            "actionNo",
-            "action",
-            "d1",
-            "d2",
-        ]:
-            xlrow.append(outputdict.get(key, ""))
-
-        # Conditionally cast some string values as ints.
-        xlrow[3] = int(xlrow[3])  # costCentre
-        try:
-            xlrow[8] = int(xlrow[8])  # project
-        except ValueError:
-            pass
-        try:
-            xlrow[9] = int(xlrow[9])  # job
-        except ValueError:
-            pass
-
-        for col, cell in enumerate(xlrow):
-            sheet.write(row_num, col, cell)
-
-    return book
-
-
-def validate_headers(row, valid_count, headings):
-    """For a passed-in CSV row, validate the count and content of each column."""
+def validate_headers(row, valid_count, headings) -> Literal[True]:
+    """For a passed-in CSV row, validate the count and content of each column.
+    Raises an exception on failure, otherwise returns True."""
     column_count = len(row)
     if column_count == valid_count:  # Correct number of columns.
         # Check column headings.
@@ -578,9 +385,9 @@ def validate_headers(row, valid_count, headings):
     return True
 
 
-def validate_upload_file(file, file_type):
+def validate_upload_file(file, file_type) -> Literal[True]:
     """Utility function called by the Upload view to validate uploaded files.
-    Should return True or raise an Exception.
+    Returns True or raises an exception.
     """
     reader = csv.reader(file, dialect="excel")
     row = next(reader)  # Get the first (header) row.
@@ -772,7 +579,7 @@ def validate_upload_file(file, file_type):
         raise Exception(f"Unknown file type {file_type}")
 
 
-def process_upload_file(file_name, file_type, fy):
+def process_upload_file(file_name, file_type, fy) -> str:
     """Utility function called by the Upload view to process an uploaded CSV file.
     Returns the type of data generated by the import."""
     if file_type == "gl_pivot_download":

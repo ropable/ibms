@@ -6,7 +6,7 @@ from django.test.client import Client
 from django.urls import reverse
 from mixer.backend.django import mixer
 
-from ibms.models import DepartmentProgram, GLPivDownload, IBMData
+from ibms.models import CorporateStrategy, DepartmentProgram, GLPivDownload, IBMData, NCStrategicPlan
 from ibms.tests import IbmsTestCase
 
 
@@ -14,7 +14,7 @@ class IbmsViewsTest(IbmsTestCase):
     """Test the ibms app views load ok."""
 
     client = Client()
-    test_data_path = os.path.join("ibms_project", "ibms", "test_data")
+    test_data_path = os.path.join("ibms", "test_data")
 
     def test_homepage_superuser(self):
         """Test homepage view contains required elements for a superuser"""
@@ -229,3 +229,27 @@ class IbmsViewsTest(IbmsTestCase):
         self.assertEqual(response.status_code, 302)
         ibmdata = IBMData.objects.first()
         self.assertEqual(ibmdata.budgetArea, "Operations")
+
+    def test_upload_view_corpstrategy_post(self):
+        """Test a valid CSV upload for CorporateStrategy data."""
+        self.assertEqual(CorporateStrategy.objects.count(), 0)
+        url = reverse("ibms:upload")
+        with open(os.path.join(self.test_data_path, "corporatestrategy_upload_test.csv"), "rb") as test_data:
+            upload = SimpleUploadedFile("upload.csv", test_data.read())
+            resp = self.client.post(
+                url, data={"upload_file_type": "corp_strategy", "upload_file": upload, "financial_year": "2024/25"}, follow=True
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(CorporateStrategy.objects.count(), 2)
+
+    def test_upload_view_ncstrategicplan_post(self):
+        """Test a valid CSV upload for NCStrategicPlan data."""
+        self.assertEqual(NCStrategicPlan.objects.count(), 0)
+        url = reverse("ibms:upload")
+        with open(os.path.join(self.test_data_path, "ncstrategicplan_upload_test.csv"), "rb") as test_data:
+            upload = SimpleUploadedFile("upload.csv", test_data.read())
+            resp = self.client.post(
+                url, data={"upload_file_type": "nature_conservation", "upload_file": upload, "financial_year": "2024/25"}, follow=True
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(NCStrategicPlan.objects.count(), 2)

@@ -1,11 +1,20 @@
+import codecs
 import csv
 
+from django.conf import settings
 from sfm.models import CostCentre, MeasurementValue, Quarter, SFMMetric
-
-from ibms.utils import csvload, save_record
 
 COLS_SFM_METRICS = 5
 COLS_COSTCENTRES = 3
+
+
+def csvload(file_name):
+    csvfile = codecs.open(file_name, encoding="utf-8", errors="ignore")
+    csv.field_size_limit(settings.CSV_FILE_LIMIT)
+    reader = csv.reader(csvfile, dialect="excel", quotechar=str('"'))
+    if not csv.Sniffer().has_header(csvfile.readline()):
+        reader.seek(0)
+    return reader, csvfile, file_name
 
 
 def import_to_sfmmetrics(fileName, fy):
@@ -88,7 +97,7 @@ def import_measurementvalues(fileName, fy):
                 "status": row[4].lower(),
                 "comment": row[5],
             }
-            save_record(MeasurementValue, data, query)
+            _, _ = MeasurementValue.objects.update_or_create(defaults=data, **query)
             i += 1
 
     except Exception as e:
