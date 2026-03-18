@@ -732,10 +732,11 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         new_ibmdata.save()
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
-        # Find any matching GLPivDownload record and set the FK link.
+        # Find any matching GLPivDownload records and set the FK link.
         if GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier).exists():
-            glpiv = GLPivDownload.objects.get(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier)
-            glpiv.ibm_data = new_ibmdata
-            glpiv.save()
+            glpivs = GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier)
+            for glpiv in glpivs:
+                glpiv.ibm_data = new_ibmdata
+                glpiv.save()
 
         return super().form_valid(form)
