@@ -3,9 +3,9 @@ from crispy_forms.layout import HTML, Div, Layout, Submit
 from django import forms
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
-from sfm.models import FinancialYear
 
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
+from sfm.models import FinancialYear
 
 
 def get_generic_choices(model, key, allow_null=False):
@@ -570,6 +570,8 @@ class IbmDataForm(forms.ModelForm):
         region_descriptions = sorted(list(region_descriptions))
         self.fields["regionDescription"].widget = ListTextWidget(name="region_description", data_list=region_descriptions)
 
+        self.fields["annualWPInfo"].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
+
         # Readonly fields
         for field in [
             "ibmIdentifier",
@@ -597,8 +599,15 @@ class IbmDataForm(forms.ModelForm):
             "priorityLevel",
         ]:
             self.fields[field].required = False
-            # Use smaller textarea widgets.
-            self.fields[field].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
+            self.fields[field].help_text = "Free text."
+
+        # Use smaller textarea widgets.
+        for field in [
+            "regionalSpecificInfo",
+            "priorityActionNo",
+            "priorityLevel",
+        ]:
+            self.fields[field].widget = forms.Textarea(attrs={"cols": "40", "rows": "1"})
 
         # crispy_forms layout
         self.helper = FormHelper()
@@ -671,6 +680,11 @@ class CodeUpdateCreateForm(forms.ModelForm):
         # Take the existing model form fields and apply the required restrictions and validation rules.
         fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
         cost_centres = IBMData.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        budget_areas = (
+            IBMData.objects.filter(fy=fy, budgetArea__isnull=False).exclude(budgetArea="").values_list("budgetArea", flat=True).distinct()
+        )
+        budget_areas = sorted(list(budget_areas))
+
         self.fields["fy"].queryset = FinancialYear.objects.filter(financialYear=kwargs["initial"]["financial_year"])
         self.fields["fy"].initial = fy
         self.fields["costCentre"].choices += sorted([(i, i) for i in cost_centres])
@@ -679,15 +693,15 @@ class CodeUpdateCreateForm(forms.ModelForm):
             MaxValueValidator(limit_value=99, message="Account value maximum is 99."),
             MinValueValidator(limit_value=0, message="Account value minimum is 00."),
         ]
-        self.fields["account"].widget.attrs.update({"min": 0, "max": 99})
-        self.fields["account"].help_text = "Numeric integer, maximum 99."
+        self.fields["account"].widget.attrs.update({"min": 1, "max": 99})
+        self.fields["account"].help_text = "Numeric integer, minimum 1, maximum 99."
         self.fields["service"].required = True
         self.fields["service"].validators = [
             MaxValueValidator(limit_value=99, message="Service value maximum is 99."),
-            MinValueValidator(limit_value=0, message="Service value minimum is 00."),
+            MinValueValidator(limit_value=10, message="Service value minimum is 10."),
         ]
-        self.fields["service"].widget.attrs.update({"min": 0, "max": 99})
-        self.fields["service"].help_text = "Numeric integer, maximum 99."
+        self.fields["service"].widget.attrs.update({"min": 10, "max": 99})
+        self.fields["service"].help_text = "Numeric integer, minimum 10, maximum 99."
         self.fields["activity"].required = True
         self.fields["activity"].help_text = "Two letters followed by one number or letter."
         self.fields["activity"].validators = [
@@ -715,6 +729,10 @@ class CodeUpdateCreateForm(forms.ModelForm):
         self.fields["job"].widget.attrs.update({"maxlength": "3"})
         self.fields["job"].widget.attrs.update({"pattern": "[A-za-z0-9]{3}"})
 
+        # CharFields using ListTextWidget
+        self.fields["budgetArea"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
+        self.fields["budgetArea"].help_text = "Free text. Click to display list of existing values."
+
         # crispy_forms layout
         self.helper = FormHelper()
         self.helper.form_class = "form-horizontal"
@@ -729,6 +747,7 @@ class CodeUpdateCreateForm(forms.ModelForm):
             "activity",
             "project",
             "job",
+            "budgetArea",
             Div(self.save_button, self.cancel_button, css_class="col-sm-offset-4 col-md-offset-3 col-lg-offset-2"),
         )
 
@@ -742,6 +761,7 @@ class CodeUpdateCreateForm(forms.ModelForm):
             "activity",
             "project",
             "job",
+            "budgetArea",
         ]
         exclude = ["id"]
 

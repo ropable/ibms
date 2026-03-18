@@ -15,7 +15,6 @@ from django.views.generic.detail import BaseDetailView
 from django.views.generic.edit import FormMixin, FormView
 from reversion import set_comment
 from reversion.views import RevisionMixin
-from sfm.models import FinancialYear
 from xlrd import open_workbook
 from xlutils.copy import copy as copy_xl
 
@@ -31,6 +30,7 @@ from ibms.forms import (
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
+from sfm.models import FinancialYear
 
 
 class SiteHomeView(LoginRequiredMixin, TemplateView):
@@ -645,6 +645,17 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         context["title"] = f"EDIT IBM DATA {obj.ibmIdentifier}"
         return context
 
+    def get_form_kwargs(self):
+        # Hack: set the account and service fields as text, and left-pad them with zeroes.
+        kwargs = super().get_form_kwargs()
+        obj = self.get_object()
+        kwargs["initial"]["account"] = str(obj.account).zfill(2)
+        kwargs["initial"]["service"] = str(obj.service).zfill(2)
+        kwargs["initial"]["project"] = obj.project.zfill(3)
+        kwargs["initial"]["job"] = obj.job.zfill(3)
+
+        return kwargs
+
     def get_success_url(self):
         if self.request.GET.get("_changelist_filters"):
             filters = self.request.GET.get("_changelist_filters")
@@ -704,6 +715,9 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         new_ibmdata.activity = new_ibmdata.activity.upper()
         new_ibmdata.project = new_ibmdata.project.upper()
         new_ibmdata.job = new_ibmdata.job.upper()
+        # Cast the account and service fields as string and left-pad them with zeroes.
+        new_ibmdata.account = str(new_ibmdata.account).zfill(2)
+        new_ibmdata.service = str(new_ibmdata.service).zfill(2)
         # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
         new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
 
@@ -715,4 +729,11 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
 
         new_ibmdata.save()
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
+
+        # Find any matching GLPivDownload record and set the FK link.
+        if GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier).exists():
+            glpiv = GLPivDownload.objects.get(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier)
+            glpiv.ibm_data = new_ibmdata
+            glpiv.save()
+
         return super().form_valid(form)
