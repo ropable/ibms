@@ -673,6 +673,9 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         obj = self.get_object()
         messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
         set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
+        # Find any matching GLPivDownload records and set the FK link.
+        for glpiv in GLPivDownload.objects.filter(fy=obj.fy, codeID=obj.ibmIdentifier, ibmdata__isnull=True):
+            glpiv.save()
         return super().form_valid(form)
 
 
@@ -733,10 +736,7 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
         # Find any matching GLPivDownload records and set the FK link.
-        if GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier).exists():
-            glpivs = GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier)
-            for glpiv in glpivs:
-                glpiv.ibm_data = new_ibmdata
-                glpiv.save()
+        for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier, ibmdata__isnull=True):
+            glpiv.save()
 
         return super().form_valid(form)
