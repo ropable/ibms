@@ -679,7 +679,7 @@ class CodeUpdateCreateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Take the existing model form fields and apply the required restrictions and validation rules.
         fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
-        cost_centres = IBMData.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        cost_centres = GLPivDownload.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
         budget_areas = (
             IBMData.objects.filter(fy=fy, budgetArea__isnull=False).exclude(budgetArea="").values_list("budgetArea", flat=True).distinct()
         )
