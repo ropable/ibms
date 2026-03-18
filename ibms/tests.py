@@ -1,3 +1,4 @@
+from random import randint
 from uuid import uuid1
 
 from django.contrib.auth import get_user_model
@@ -34,6 +35,8 @@ class IbmsTestCase(TestCase):
             IBMData,
             fy=self.fy,
             ibmIdentifier=str(uuid1()),
+            account=randint(1, 99),
+            service=randint(10, 99),
             costCentre="999",
             budgetArea="Admin",
             activity="AA1",

@@ -691,7 +691,7 @@ class CodeUpdateCreateForm(forms.ModelForm):
         self.fields["account"].required = True
         self.fields["account"].validators = [
             MaxValueValidator(limit_value=99, message="Account value maximum is 99."),
-            MinValueValidator(limit_value=0, message="Account value minimum is 00."),
+            MinValueValidator(limit_value=1, message="Account value minimum is 01."),
         ]
         self.fields["account"].widget.attrs.update({"min": 1, "max": 99})
         self.fields["account"].help_text = "Numeric integer, minimum 1, maximum 99."

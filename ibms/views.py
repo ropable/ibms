@@ -651,8 +651,10 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         obj = self.get_object()
         kwargs["initial"]["account"] = str(obj.account).zfill(2)
         kwargs["initial"]["service"] = str(obj.service).zfill(2)
-        kwargs["initial"]["project"] = obj.project.zfill(3)
-        kwargs["initial"]["job"] = obj.job.zfill(3)
+        if "project" in kwargs["initial"]:
+            kwargs["initial"]["project"] = obj.project.zfill(3)
+        if "job" in kwargs["initial"]:
+            kwargs["initial"]["job"] = obj.job.zfill(3)
 
         return kwargs
 
