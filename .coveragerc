@@ -1,0 +1,10 @@
+[report]
+omit =
+    */management/commands/*
+    */migrations/*
+    */test_*
+    */__init__.py
+    ibms_project/*
+    sfm/*
+    manage.py
+    gunicorn.py

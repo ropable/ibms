@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from io import StringIO
 
 from django.conf import settings
 from django.contrib import messages
@@ -119,42 +120,45 @@ class UploadView(RevisionMixin, IbmsFormView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Uploaded CSVs may contain characters with oddball encodings.
-        # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
-        # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
-        # in a consistent fashion.
-        with tempfile.NamedTemporaryFile(mode="w+b", delete=True) as t:
+        fy = form.cleaned_data["financial_year"]
+        file_type = form.cleaned_data["upload_file_type"]
+
+        with tempfile.NamedTemporaryFile(mode="w+b", delete=True) as temp_file:
+            # Uploaded CSVs may contain characters with oddball Windows encodings.
+            # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
+            # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
+            # in a consistent fashion.
             for chunk in form.cleaned_data["upload_file"].chunks():
-                t.write(chunk.decode("utf-8", "ignore").encode())
-            t.flush()
+                temp_file.write(chunk.decode("utf-8", "ignore").encode())
+            temp_file.flush()
+            temp_file.seek(0)
 
-            with open(t.name, "r") as file:
-                # process file
-                file = open(t.name, "r")
-                file_type = form.cleaned_data["upload_file_type"]
+            # Extract the first row of the CSV for the purpose of validating the columns.
+            header_row = temp_file.readline()
+            header_row = header_row.decode()
+            in_file = StringIO(header_row)
+            temp_file.seek(0)
 
-                # Catch exception thrown by the upload validation process and display it to the user.
+            try:
+                upload_valid = validate_upload_file(in_file, file_type)
+            except Exception as e:
+                messages.warning(self.request, f"Error: {str(e)}")
+                return super().form_invalid(form)
+
+            # Upload may still not be valid, but at least no exception was thrown.
+            if upload_valid:
                 try:
-                    upload_valid = validate_upload_file(file, file_type)
+                    data_type = process_upload_file(temp_file.name, file_type, fy)
+                    messages.success(self.request, f"{data_type} data imported successfully")
                 except Exception as e:
                     messages.warning(self.request, f"Error: {str(e)}")
-                    return super().form_invalid(form)
+            else:
+                messages.warning(
+                    self.request,
+                    f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
+                )
 
-                # Upload may still not be valid, but at least no exception was thrown.
-                if upload_valid:
-                    fy = form.cleaned_data["financial_year"]
-                    try:
-                        data_type = process_upload_file(file.name, file_type, fy)
-                        messages.success(self.request, f"{data_type} data imported successfully")
-                    except Exception as e:
-                        messages.warning(self.request, f"Error: {str(e)}")
-                else:
-                    messages.warning(
-                        self.request,
-                        f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
-                    )
-
-                return super().form_valid(form)
+            return super().form_valid(form)
 
 
 class DownloadView(IbmsFormView):
