@@ -1,7 +1,7 @@
 import codecs
 import csv
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from django.conf import settings
@@ -38,9 +38,9 @@ class FieldLengthError(IBMSValidationError):
 def get_download_period():
     """Return the 'newest' download_period date value for all the GLPivDownload objects."""
     if not GLPivDownload.objects.exists():
-        return datetime.today()
+        return date.today()
     elif not GLPivDownload.objects.filter(download_period__isnull=False).exists():
-        return datetime.today()
+        return date.today()
     return GLPivDownload.objects.order_by("-download_period").first().download_period
 
 
@@ -344,11 +344,11 @@ def validate_headers(row, valid_count, headings) -> Literal[True]:
                 bad_headings += f"{row[k]} does not match {heading}\n"
 
         if bad_headings:
-            raise Exception(f"""The column headings in the CSV file do not match the required headings:\n
+            raise IBMSValidationError(f"""The column headings in the CSV file do not match the required headings:\n
                             {bad_headings}""")
 
     else:  # Incorrect number of columns
-        raise Exception(f"""The number of columns in the CSV file do not match the required column count:\n
+        raise IBMSValidationError(f"""The number of columns in the CSV file do not match the required column count:\n
                         expected {valid_count}, received {column_count}""")
 
     return True
@@ -545,7 +545,7 @@ def validate_upload_file(in_file, file_type) -> Literal[True]:
         )
 
     else:
-        raise Exception(f"Unknown file type {file_type}")
+        raise IBMSValidationError(f"Unknown file type {file_type}")
 
 
 def process_upload_file(file_name, file_type, fy) -> str:

@@ -43,3 +43,12 @@ class IbmsTestCase(TestCase):
             projectSponsor=self.fake.name(),
         )
         self.client.login(username="testuser", password="test")
+
+    def _create_user(self, username):
+        """Helper to create a non-admin user"""
+
+        User = get_user_model()
+        return User.objects.create_user(
+            username=username,
+            password="test",
+        )
