@@ -6,6 +6,7 @@ from io import StringIO
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import FieldDoesNotExist
 from django.db import connection
 from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
 from django.shortcuts import redirect
@@ -698,6 +699,10 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         context["download_period"] = get_download_period()
         context["page_title"] = f"{settings.SITE_ACRONYM} | Code update"
         context["title"] = "CODE UPDATE"
+        # Additional context injected to the template for JavaScript UI.
+        context["javascript_context"] = {
+            "ajax_ibmdata_budgetarea_url": reverse("ibms:ajax_ibmdata_budgetarea"),
+        }
         return context
 
     def get_form_kwargs(self):

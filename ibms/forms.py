@@ -492,7 +492,7 @@ class IbmDataForm(forms.ModelForm):
         choices=[("", "--------")],
         label="Service priority ID",
         required=False,
-        help_text="Must match Service Number e.g. S24 - WM",
+        help_text="Must match existing Service Number e.g. S24 - WM",
     )
     marineKPI = forms.CharField(
         label="Marine KPI",
