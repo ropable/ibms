@@ -478,6 +478,8 @@ class ListTextWidget(forms.TextInput):
 
 
 class IbmDataForm(forms.ModelForm):
+    """Edit form in use for the Data Amendment view."""
+
     budgetArea = forms.CharField(
         label="Budget area",
         required=True,
@@ -664,6 +666,8 @@ class IbmDataForm(forms.ModelForm):
 
 
 class CodeUpdateCreateForm(forms.ModelForm):
+    """Create form used for the Code Update view."""
+
     fy = forms.ModelChoiceField(
         queryset=None,
         empty_label=None,
@@ -672,6 +676,20 @@ class CodeUpdateCreateForm(forms.ModelForm):
         label="Financial year",
     )
     costCentre = forms.ChoiceField(choices=[("", "--------")], required=True, label="Cost centre")
+    service = forms.ChoiceField(
+        choices=[
+            ("", "--------"),
+            ("12", "12"),
+            ("24", "24"),
+            ("32", "32"),
+            ("41", "41"),
+            ("42", "42"),
+            ("43", "43"),
+            ("72", "72"),
+            ("75", "75"),
+        ],
+        required=True,
+    )
     save_button = Submit("save", "Save", css_class="btn-lg")
     cancel_button = Submit("cancel", "Cancel", css_class="btn-secondary")
 
@@ -695,13 +713,6 @@ class CodeUpdateCreateForm(forms.ModelForm):
         ]
         self.fields["account"].widget.attrs.update({"min": 1, "max": 99})
         self.fields["account"].help_text = "Numeric integer, minimum 1, maximum 99."
-        self.fields["service"].required = True
-        self.fields["service"].validators = [
-            MaxValueValidator(limit_value=99, message="Service value maximum is 99."),
-            MinValueValidator(limit_value=10, message="Service value minimum is 10."),
-        ]
-        self.fields["service"].widget.attrs.update({"min": 10, "max": 99})
-        self.fields["service"].help_text = "Numeric integer, minimum 10, maximum 99."
         self.fields["activity"].required = True
         self.fields["activity"].help_text = "Two letters followed by one number or letter."
         self.fields["activity"].validators = [
