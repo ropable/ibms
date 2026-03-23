@@ -651,16 +651,13 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         return context
 
     def get_form_kwargs(self):
-        # Hack: set the account and service fields as text, and left-pad them with zeroes.
+        # Set default values in some non-editable form fields for display purposes.
         kwargs = super().get_form_kwargs()
         obj = self.get_object()
-        kwargs["initial"]["account"] = str(obj.account).zfill(2)
-        kwargs["initial"]["service"] = str(obj.service).zfill(2)
-        if "project" in kwargs["initial"]:
-            kwargs["initial"]["project"] = obj.project.zfill(3)
-        if "job" in kwargs["initial"]:
-            kwargs["initial"]["job"] = obj.job.zfill(3)
-
+        kwargs["initial"]["account"] = obj.get_account_display()
+        kwargs["initial"]["service"] = obj.get_service_display()
+        kwargs["initial"]["project"] = obj.get_project_display()
+        kwargs["initial"]["job"] = obj.get_job_display()
         return kwargs
 
     def get_success_url(self):

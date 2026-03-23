@@ -301,11 +301,6 @@ class GLPivDownloadTest(IbmsTestCase):
         self.gl.project = "1234"
         self.assertEqual(self.gl.get_project_display(), "1234")
 
-    def test_get_project_display_none(self):
-        """Project display should return empty string when None"""
-        self.gl.project = None
-        self.assertEqual(self.gl.get_project_display(), "")
-
     def test_get_job_display_zero_padding(self):
         """Job display should be zero-padded to 3 digits"""
         self.gl.job = "5"

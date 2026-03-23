@@ -123,7 +123,10 @@ class IBMData(models.Model):
 
     def get_job_display(self) -> str:
         """The job display value should be returned as a string (integer, left-padded with zeros)."""
-        return str(self.job).zfill(3)
+        if self.job:
+            return str(self.job).zfill(3)
+        else:
+            return ""
 
     def get_region_branch(self) -> str:
         """This value belongs to linked GLPivDownload objects."""
@@ -259,10 +262,7 @@ class GLPivDownload(models.Model):
 
     def get_project_display(self) -> str:
         """The project display value should be returned as a string (integer, left-padded with zeros)."""
-        if self.project:
-            return str(self.project).zfill(4)
-        else:
-            return ""
+        return str(self.project).zfill(4)
 
     def get_job_display(self) -> str:
         """The job display value should be returned as a string (integer, left-padded with zeros)."""

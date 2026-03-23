@@ -108,8 +108,8 @@ class IBMDataAdmin(VersionAdmin):
                     "account_display",
                     "service",
                     "activity",
-                    "project",
-                    "job",
+                    "project_display",
+                    "job_display",
                     "priorityActionNo",
                     "priorityLevel",
                     "marineKPI",
@@ -179,6 +179,16 @@ class IBMDataAdmin(VersionAdmin):
         return obj.get_account_display()
 
     account_display.short_description = "account"
+
+    def project_display(self, obj):
+        return obj.get_project_display()
+
+    project_display.short_description = "project"
+
+    def job_display(self, obj):
+        return obj.get_job_display()
+
+    job_display.short_description = "job"
 
     def service_priority_link(self, obj):
         if obj.service_priority:
