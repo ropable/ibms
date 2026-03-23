@@ -4,7 +4,15 @@ from django import forms
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 
-from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
+from ibms.models import (
+    ERServicePriority,
+    GeneralServicePriority,
+    GLPivDownload,
+    IBMData,
+    NCServicePriority,
+    PVSServicePriority,
+    SFMServicePriority,
+)
 from sfm.models import FinancialYear
 
 
@@ -494,7 +502,6 @@ class IbmDataForm(forms.ModelForm):
         choices=[("", "--------")],
         label="Service priority ID",
         required=False,
-        help_text="Must match existing Service Number e.g. S24 - WM",
     )
     marineKPI = forms.CharField(
         label="Marine KPI",
@@ -538,11 +545,25 @@ class IbmDataForm(forms.ModelForm):
         project_sponsors = sorted(list(project_sponsors))
         self.fields["projectSponsor"].widget = ListTextWidget(name="project_sponsors", data_list=project_sponsors)
 
-        service_priority_ids = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, servicePriorityID__isnull=False)
-            .values_list("servicePriorityID", flat=True)
-            .distinct()
-        )
+        # Service priority ID value options are sourced from a different model, depending on the instances service value.
+        if instance.service == 12:
+            service_priority_ids = (
+                GeneralServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            )
+        elif instance.service == 24:
+            service_priority_ids = NCServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service == 32:
+            service_priority_ids = PVSServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service in [41, 42, 43]:
+            service_priority_ids = SFMServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service in [72, 75]:
+            service_priority_ids = ERServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        else:
+            service_priority_ids = (
+                IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, servicePriorityID__isnull=False)
+                .values_list("servicePriorityID", flat=True)
+                .distinct()
+            )
         self.fields["servicePriorityID"].choices += sorted([(i, i) for i in service_priority_ids if i])
 
         marine_kpis = (
