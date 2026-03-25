@@ -1,6 +1,14 @@
 # syntax=docker/dockerfile:1
 FROM dhi.io/python:3.13-debian13-dev AS build-stage
 
+# Install system packages required to install the project
+RUN apt-get update -y \
+  # Python package dependencies: gunicorn_h1c requires gcc
+  && apt-get install -y --no-install-recommends gcc g++ \
+  # Run shared library linker after installing packages
+  && ldconfig \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy and configure uv, to install dependencies
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /bin/
 WORKDIR /app
