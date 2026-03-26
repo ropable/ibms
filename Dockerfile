@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM dhi.io/python:3.13-debian13-dev AS build-stage
+FROM dhi.io/python:3.13-debian13-dev
+LABEL org.opencontainers.image.authors=asi@dbca.wa.gov.au
+LABEL org.opencontainers.image.source=https://github.com/dbca-wa/ibms
 
 # Install system packages required to install the project
 RUN apt-get update -y \
@@ -10,7 +12,7 @@ RUN apt-get update -y \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy and configure uv, to install dependencies
-COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /bin/
 WORKDIR /app
 # Install project dependencies
 COPY pyproject.toml uv.lock ./
@@ -31,18 +33,7 @@ COPY sfm ./sfm
 RUN python -m compileall ibms_project \
   && python manage.py collectstatic --noinput
 
-##################################################################################
-
-FROM dhi.io/python:3.13-debian13 AS runtime-stage
-LABEL org.opencontainers.image.authors=asi@dbca.wa.gov.au
-LABEL org.opencontainers.image.source=https://github.com/dbca-wa/ibms
-
-# Copy over the built project and virtualenv
-WORKDIR /app
-COPY --from=build-stage /app /app
-
-# Image runs as the nonroot user
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/app/.venv/bin:$PATH"
+# Run project as the nonroot user
+USER nonroot
 EXPOSE 8080
 CMD ["gunicorn", "ibms_project.wsgi", "--config", "gunicorn.py"]
