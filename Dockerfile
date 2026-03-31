@@ -21,6 +21,7 @@ RUN uv sync --no-group dev --link-mode=copy --compile-bytecode --no-python-downl
   && rm -rf /bin/uv \
   && rm uv.lock
 
+# Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/app/.venv/bin:$PATH"
 
