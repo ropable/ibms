@@ -2,9 +2,13 @@ name: 'Run unit tests'
 
 on:
   push:
-    branches: [master, dev]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [master]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   run_tests:
