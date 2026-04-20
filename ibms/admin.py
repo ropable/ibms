@@ -1,4 +1,5 @@
 import csv
+import logging
 from typing import List, Optional
 
 from django import forms
@@ -22,6 +23,8 @@ from .models import (
     SFMServicePriority,
 )
 
+LOGGER = logging.getLogger("ibms")
+
 
 def export_as_csv_action(
     fields: Optional[List[str]] = None,
@@ -37,10 +40,12 @@ def export_as_csv_action(
     ``header`` defines whether or not the column names are output as the first row.
     """
 
-    def export_as_csv(modeladmin, _, queryset):
+    def export_as_csv(modeladmin, request, queryset):
         """
         Generic csv export admin action.
         """
+        # Basic audit logging.
+        LOGGER.info(f"{queryset.model._meta.verbose_name} CSV export by {request.user.username}: {queryset.count()} records")
         field_names = [field.name for field in modeladmin.model._meta.fields]
         if fields:
             field_names = fields
