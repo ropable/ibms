@@ -31,7 +31,7 @@ COPY ibms_project ./ibms_project
 COPY ibms ./ibms
 COPY sfm ./sfm
 # Compile scripts and collect static files
-RUN python -m compileall ibms_project \
+RUN python -m compileall -q ibms_project ibms sfm \
   && python manage.py collectstatic --noinput
 
 # Run project as the nonroot user
