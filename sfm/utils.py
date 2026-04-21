@@ -17,8 +17,8 @@ def csvload(file_name):
     return reader, csvfile, file_name
 
 
-def import_to_sfmmetrics(fileName, fy):
-    reader, file, fileName = csvload(fileName)
+def import_to_sfmmetrics(file_name, fy):
+    reader, file, file_name = csvload(file_name)
 
     try:
         i = 1
@@ -43,8 +43,8 @@ def import_to_sfmmetrics(fileName, fy):
     return
 
 
-def import_to_costcentres(fileName):
-    reader, file, fileName = csvload(fileName)
+def import_to_costcentres(file_name):
+    reader, file, file_name = csvload(file_name)
 
     try:
         i = 1
@@ -67,8 +67,8 @@ def import_to_costcentres(fileName):
     return
 
 
-def import_measurementvalues(fileName, fy):
-    reader, file, fileName = csvload(fileName)
+def import_measurementvalues(file_name, fy):
+    reader, file, file_name = csvload(file_name)
 
     try:
         i = 1
@@ -106,22 +106,22 @@ def import_measurementvalues(fileName, fy):
     return
 
 
-def process_upload_file(file_name, fileType, fy):
-    if fileType == "sfmmetrics":
+def process_upload_file(file_name, file_type, fy):
+    if file_type == "sfmmetrics":
         import_to_sfmmetrics(file_name, fy)
-    elif fileType == "costcentres":
+    elif file_type == "costcentres":
         import_to_costcentres(file_name)
-    elif fileType == "measurementvalues":
+    elif file_type == "measurementvalues":
         import_measurementvalues(file_name, fy)
 
 
-def validate_file(file, fileType):
+def validate_file(file, file_type):
     reader = csv.reader(file, dialect="excel")
-    if fileType == "sfmmetrics":
+    if file_type == "sfmmetrics":
         return validate_sfmmetrics_header(reader)
-    if fileType == "costcentres":
+    if file_type == "costcentres":
         return validate_costcentre_header(reader)
-    if fileType == "measurementvalues":
+    if file_type == "measurementvalues":
         return validate_measurementvalues_header(reader)
 
     return False
@@ -130,19 +130,19 @@ def validate_file(file, fileType):
 def validate_sfmmetrics_header(reader):
     row = next(reader)
     if len(row) == COLS_SFM_METRICS:
-        sBad = ""
+        bad_cols = ""
         if row[0].strip() != "region":
-            sBad += row[0] + " : " + "region\n"
+            bad_cols += row[0] + " : " + "region\n"
         if row[1].strip() != "servicePriorityNo":
-            sBad += row[1] + " : " + "servicePriorityNo\n"
+            bad_cols += row[1] + " : " + "servicePriorityNo\n"
         if row[2].strip() != "metricID":
-            sBad += row[2] + " : " + "metricID\n"
+            bad_cols += row[2] + " : " + "metricID\n"
         if row[3].strip() != "descriptor":
-            sBad += row[3] + " : " + "descriptor\n"
-        retVal = sBad == ""
+            bad_cols += row[3] + " : " + "descriptor\n"
+        is_valid = bad_cols == ""
 
-        if not retVal:
-            raise Exception("The column headings in the CSV file do not match the required headings\n{}".format(sBad))
+        if not is_valid:
+            raise Exception("The column headings in the CSV file do not match the required headings\n{}".format(bad_cols))
     else:
         raise Exception(
             "The number of columns in the CSV file do not match the required column count :\nExpects {}, found {}".format(
@@ -150,23 +150,23 @@ def validate_sfmmetrics_header(reader):
             )
         )
 
-    return retVal
+    return is_valid
 
 
 def validate_costcentre_header(reader):
     row = next(reader)
     if len(row) == COLS_COSTCENTRES:
-        sBad = ""
+        bad_cols = ""
         if row[0].strip() != "costCentre":
-            sBad += row[0] + " : " + "costCentre\n"
+            bad_cols += row[0] + " : " + "costCentre\n"
         if row[1].strip() != "name":
-            sBad += row[1] + " : " + "name\n"
+            bad_cols += row[1] + " : " + "name\n"
         if row[2].strip() != "region":
-            sBad += row[2] + " : " + "region\n"
-        retVal = sBad == ""
+            bad_cols += row[2] + " : " + "region\n"
+        is_valid = bad_cols == ""
 
-        if not retVal:
-            raise Exception("The column headings in the CSV file do not match the required headings\n{}".format(sBad))
+        if not is_valid:
+            raise Exception("The column headings in the CSV file do not match the required headings\n{}".format(bad_cols))
     else:
         raise Exception(
             "The number of columns in the CSV file do not match the required column count :\nExpects {}, found {}".format(
@@ -174,27 +174,27 @@ def validate_costcentre_header(reader):
             )
         )
 
-    return retVal
+    return is_valid
 
 
 def validate_measurementvalues_header(reader):
     row = next(reader)
-    sBad = ""
+    bad_cols = ""
     if row[0].strip() != "quarter":
-        sBad += row[0] + " : " + "quarter\n"
+        bad_cols += row[0] + " : " + "quarter\n"
     if row[1].strip() != "region":
-        sBad += row[1] + " : " + "region\n"
+        bad_cols += row[1] + " : " + "region\n"
     if row[2].strip() != "sfmMetric":
-        sBad += row[2] + " : " + "sfmMetric\n"
+        bad_cols += row[2] + " : " + "sfmMetric\n"
     if row[3].strip() != "planned":
-        sBad += row[3] + " : " + "planned\n"
+        bad_cols += row[3] + " : " + "planned\n"
     if row[4].strip() != "status":
-        sBad += row[4] + " : " + "status\n"
+        bad_cols += row[4] + " : " + "status\n"
     if row[5].strip() != "comment":
-        sBad += row[5] + " : " + "comment\n"
-    retVal = sBad == ""
+        bad_cols += row[5] + " : " + "comment\n"
+    is_valid = bad_cols == ""
 
-    if not retVal:
-        raise Exception("The column headings in the CSV file do not match the required headings\n" + sBad)
+    if not is_valid:
+        raise Exception("The column headings in the CSV file do not match the required headings\n" + bad_cols)
 
-    return retVal
+    return is_valid

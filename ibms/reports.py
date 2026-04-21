@@ -181,9 +181,9 @@ def code_update_report(workbook_ro, workbook, gl, gl_codeids, nc_sp, pvs_sp, fm_
     # Start inserting GL codes at row 4.
     row = 4
 
-    for _, codeID in enumerate(gl_codeids, start=1):
+    for _, code_id in enumerate(gl_codeids, start=1):
         # For each of the GL code IDs, take a subset of the query and insert values as required.
-        gl_pivs = gl.filter(codeID=codeID)
+        gl_pivs = gl.filter(codeID=code_id)
         g = gl_pivs.first()  # Use the first GL code to write common values.
 
         # Fill the non-resource columns.
@@ -301,32 +301,32 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
     sheet = workbook.get_sheet(3)
 
     jobs = []
-    jobNames = []
-    jobDict = {}
-    jobNoNumDict = {}
+    job_names = []
+    job_dict = {}
+    job_no_num_dict = {}
     current_row = 0
     for row, data in enumerate(gl):
-        if data.job not in jobs or data.jobName not in jobNames:
+        if data.job not in jobs or data.jobName not in job_names:
             # sheet.write(current_row, 0, data.job)
             # sheet.write(current_row, 1, data.jobName)
             if data.job.isdigit():
                 job = {"job": int(data.job), "jobName": data.jobName}
-                jobDict[current_row] = job
+                job_dict[current_row] = job
             else:
                 job = {"job": data.job, "jobName": data.jobName}
-                jobNoNumDict[current_row] = job
+                job_no_num_dict[current_row] = job
             jobs.append(data.job)
-            jobNames.append(data.jobName)
+            job_names.append(data.jobName)
             current_row += 1
         else:
             pass
     current_row = 0
-    for s in sorted(jobDict.items(), key=lambda k_v: k_v[1]["job"]):
+    for s in sorted(job_dict.items(), key=lambda k_v: k_v[1]["job"]):
         sheet.write(current_row, 0, str(s[1]["job"]))
         sheet.write(current_row, 1, s[1]["jobName"])
         current_row += 1
 
-    for s in sorted(jobNoNumDict.items(), key=lambda k_v: k_v[1]["job"]):
+    for s in sorted(job_no_num_dict.items(), key=lambda k_v: k_v[1]["job"]):
         sheet.write(current_row, 0, s[1]["job"])
         sheet.write(current_row, 1, s[1]["jobName"])
         current_row += 1
