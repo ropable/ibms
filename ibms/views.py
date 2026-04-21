@@ -487,6 +487,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
     http_method_names = ["get", "head", "options"]
     form_class = IbmDataFilterForm
     template_name = "ibms/data_amendment_list.html"
+    paginate_by = 1000  # Precaution: set an upper bound on a queryset that returns data. We should never exceed this.
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -546,31 +547,30 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         return context
 
     def get_queryset(self):
-        qs = super().get_queryset()
 
-        # Financial year
+        # Financial year (in operation, we don't allow end-users to change this and default to the current FY)
         if self.request.GET.get("financial_year"):
             fy = FinancialYear.objects.get(financialYear=self.request.GET["financial_year"])
         else:
             # Filter by the newest financial year.
             fy = FinancialYear.objects.order_by("-financialYear").first()
 
-        qs = qs.filter(fy=fy)
+        qs = IBMData.objects.filter(fy=fy)
+
+        # Short-circuit: if we don't have either CC or region/branch filters, return an empty queryset.
+        if not (self.request.GET.get("cost_centre", None) or self.request.GET.get("region", None)):
+            return qs.none()
 
         # Business rule: exclude activity == "DJ0".
         qs = qs.exclude(activity="DJ0")
         # Business rule: exclude records with an empty budgetArea.
         qs = qs.exclude(budgetArea="")
 
-        # If we don't have either CC or region/branch filters, return an empty queryset.
-        if not (self.request.GET.get("cost_centre", None) or self.request.GET.get("region", None)):
-            return qs.none()
-
         # Cost centre
         if self.request.GET.get("cost_centre", None):
             # Validate the cost_centre value that was passed in.
             cost_centre = self.request.GET["cost_centre"]
-            valid_cc_set = set(IBMData.objects.values_list("costCentre", flat=True))
+            valid_cc_set = IBMData.objects.values_list("costCentre", flat=True).distinct()
             if cost_centre not in valid_cc_set:
                 raise ValueError("Invalid cost centre")
             qs = qs.filter(costCentre=cost_centre)
@@ -579,19 +579,15 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("region", None):
             # As regionBranch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
             # then use those values to filter the IBMData queryset.
-            # Validate the region_branch value that was passed in.
             region_branch = self.request.GET["region"]
-            valid_region_set = set(IBMData.objects.values_list("regionBranch", flat=True))
-            if region_branch not in valid_region_set:
-                raise ValueError("Invalid region or branch")
-            cost_centres = set(GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True))
+            cost_centres = GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True).distinct()
             qs = qs.filter(costCentre__in=cost_centres)
 
         # Service
         if self.request.GET.get("service", None):
             # Validate the service value that was passed in.
             service = self.request.GET["service"]
-            valid_service_set = set(IBMData.objects.values_list("service", flat=True))
+            valid_service_set = IBMData.objects.values_list("service", flat=True).distinct()
             if service not in valid_service_set:
                 raise ValueError("Invalid service")
             qs = qs.filter(service=service)
@@ -600,7 +596,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("project", None):
             # Validate the project value that was passed in.
             project = self.request.GET["project"]
-            valid_project_set = set(IBMData.objects.values_list("project", flat=True))
+            valid_project_set = IBMData.objects.values_list("project", flat=True).distinct()
             if project not in valid_project_set:
                 raise ValueError("Invalid project")
             qs = qs.filter(project=project)
@@ -609,7 +605,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("job", None):
             # Validate the job value that was passed in.
             job = self.request.GET["job"]
-            valid_job_set = set(IBMData.objects.values_list("job", flat=True))
+            valid_job_set = IBMData.objects.values_list("job", flat=True).distinct()
             if job not in valid_job_set:
                 raise ValueError("Invalid job")
             qs = qs.filter(job=job)
@@ -618,7 +614,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("budget_area", None):
             # Validate the budget_area value that was passed in.
             budget_area = self.request.GET["budget_area"]
-            valid_budget_set = set(IBMData.objects.values_list("budgetArea", flat=True))
+            valid_budget_set = IBMData.objects.values_list("budgetArea", flat=True).distinct()
             if budget_area not in valid_budget_set:
                 raise ValueError("Invalid budget area")
             qs = qs.filter(budgetArea=budget_area)
@@ -627,7 +623,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("project_sponsor", None):
             # Validate the project_sponsor value that was passed in.
             project_sponsor = self.request.GET["project_sponsor"]
-            valid_sponsor_set = set(IBMData.objects.values_list("projectSponsor", flat=True))
+            valid_sponsor_set = IBMData.objects.values_list("projectSponsor", flat=True).distinct()
             if project_sponsor not in valid_sponsor_set:
                 raise ValueError("Invalid project sponsor")
             qs = qs.filter(projectSponsor=project_sponsor)
@@ -636,9 +632,13 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
 
 
 class DataAmendmentUpdate(RevisionMixin, UpdateView):
+    """An edit view to allow users to make changes to individual IBMData objects.
+    At present, no additional authorisation checks are performed (all users can edit all records).
+    """
+
     model = IBMData
     form_class = IbmDataForm
-    http_method_names = ["get", "post", "put", "patch", "head", "options"]
+    http_method_names = ["get", "post", "head", "options"]
     template_name = "ibms/data_amendment_update.html"
 
     def get_context_data(self, **kwargs):
@@ -682,7 +682,7 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
 
 
 class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
-    """A form to allow users to manually generate an IBMData object via a form."""
+    """A create view to allow users to manually generate an IBMData object via a form."""
 
     model = IBMData
     form_class = CodeUpdateCreateForm
