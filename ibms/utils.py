@@ -1,9 +1,12 @@
 import codecs
 import csv
+import io
+import os
 from contextlib import contextmanager
 from datetime import date, datetime
 from typing import Literal
 
+from azure.storage.blob import BlobClient
 from django.conf import settings
 from reversion import create_revision, set_comment
 
@@ -75,8 +78,27 @@ def csvload_context(file_name: str):
         csvfile.close()
 
 
+@contextmanager
+def blobload_context(blob_client: BlobClient):
+    """For a passed-in Azure BlobClient, streams the blob content and returns a CSV reader.
+    The blob is decoded as UTF-8 (ignoring errors) and wrapped in a StringIO so it can be
+    iterated without writing to disk.
+    """
+    csv.field_size_limit(settings.CSV_FILE_LIMIT)
+    stream = blob_client.download_blob()
+    content = stream.readall().decode("utf-8", errors="ignore")
+    csvfile = io.StringIO(content)
+    try:
+        reader = csv.reader(csvfile, dialect="excel")
+        if not csv.Sniffer().has_header(sample=csvfile.readline()):
+            csvfile.seek(0)
+        yield reader
+    finally:
+        csvfile.close()
+
+
 def ibms_import_from_csv(
-    file_name: str,
+    source: str | BlobClient,
     fy: FinancialYear,
     model: type[
         GLPivDownload
@@ -91,13 +113,16 @@ def ibms_import_from_csv(
         | ERServicePriority
         | ServicePriorityMapping
     ],
-) -> str:
-    """Generic utility function to take a CSV file, a FinancialYear object and an IBMS model
-    and import that data (update existing or create new records).
+) -> tuple[str, int]:
+    """Generic utility function to take a CSV source (file path or Azure BlobClient),
+    a FinancialYear object and an IBMS model, and import that data (update existing or create new records).
     """
+    ctx = blobload_context(source) if isinstance(source, BlobClient) else csvload_context(source)
     return_str = None
-    with csvload_context(file_name) as reader:
+    record_count = 0
+    with ctx as reader:
         for row in reader:
+            record_count += 1
             if model == GLPivDownload:
                 # NOTE: this branch differs from the others, in that it assumes a superuser will first clear existing
                 # GLPivDownload records for a given financial year.
@@ -326,9 +351,9 @@ def ibms_import_from_csv(
                 obj.save()
 
         if not return_str:
-            return model._meta.verbose_name.capitalize()
+            return model._meta.verbose_name.capitalize(), record_count
         else:
-            return return_str
+            return return_str, record_count
 
 
 def validate_headers(row, valid_count, headings) -> Literal[True]:
@@ -577,3 +602,17 @@ def process_upload_file(file_name, file_type, fy) -> str:
         raise Exception(f"process_upload_file : file type {file_type} unknown")
 
     return data_type
+
+
+def upload_file(source_path, container_name, conn_str, overwrite=True, blob_name=None, logger=None):
+    """Upload a single file at `source_path` to Azure blob storage (`blob_name` destination name is optional)."""
+    if not blob_name:
+        blob_name = os.path.basename(source_path)
+
+    blob_client = BlobClient.from_connection_string(conn_str, container_name, blob_name)
+
+    if logger:
+        logger.info(f"Uploading {source_path} to container {container_name}/{blob_name}")
+
+    with open(file=source_path, mode="rb") as data:
+        blob_client.upload_blob(data, overwrite=overwrite, validate_content=True)

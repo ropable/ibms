@@ -25,6 +25,9 @@ dependencies = [
   "django-reversion==6.1.0",
   "markupsafe>=3.0.3",
   "dbca-utils==2.1.5",
+  "azure-storage-blob==12.28.0",
+  "django-tasks==0.12.0",
+  "django-tasks-db==0.12.0",
 ]
 
 [dependency-groups]

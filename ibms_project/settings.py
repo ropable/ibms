@@ -52,6 +52,8 @@ INSTALLED_APPS = (
     "crispy_forms",
     "crispy_bootstrap5",
     "reversion",
+    "django_tasks",  # TODO: switch to the contrib version on upgrade to Django 6+
+    "django_tasks_db",
     "webtemplate_dbca",
     "ibms",
     "sfm",
@@ -114,6 +116,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = None  # Required to allow end-of-month GLPivot b
 CSV_FILE_LIMIT = env("CSV_FILE_LIMIT", 100000000)  # 100MB
 SHAREPOINT_IBMS = env("SHAREPOINT_IBMS", "")
 MAX_UPLOAD_SIZE = env("MAX_UPLOAD_SIZE", 100000000)  # 100MB
+AZURE_STORAGE_CONTAINER_NAME = env("AZURE_STORAGE_CONTAINER_NAME", "ibms")
 
 
 # Database configuration
@@ -176,10 +179,12 @@ LOGGING = {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
         },
-        "ibms": {"handlers": ["console"], "level": "INFO"},
+        "ibms": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
 
 # django-crispy-forms config
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+TASKS = {"default": {"BACKEND": "django_tasks_db.DatabaseBackend", "QUEUES": ["default"]}}

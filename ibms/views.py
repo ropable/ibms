@@ -1,8 +1,10 @@
 import json
+import logging
 import os
 import tempfile
 from io import StringIO
 
+from azure.storage.blob import BlobServiceClient
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -31,8 +33,11 @@ from ibms.forms import (
 )
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
+from ibms.tasks import process_uploaded_csv
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
 from sfm.models import FinancialYear
+
+LOGGER = logging.getLogger("ibms")
 
 
 class SiteHomeView(LoginRequiredMixin, TemplateView):
@@ -749,3 +754,43 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
             glpiv.save()
 
         return super().form_valid(form)
+
+
+class BlobUploadView(UploadView):
+    """Extends UploadView to stream the uploaded CSV directly to Azure Blob Storage
+    instead of processing it locally. Requires the AZURE_STORAGE_CONNECTION_STRING
+    environment variable to be set. AZURE_STORAGE_CONTAINER_NAME must also be
+    defined in settings.
+    """
+
+    def get_success_url(self):
+        return reverse("ibms:blob_upload")
+
+    def form_valid(self, form):
+        fy = form.cleaned_data["financial_year"]
+        file_type = form.cleaned_data["upload_file_type"]
+        upload_file = form.cleaned_data["upload_file"]
+        connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        if not connection_string:
+            messages.error(self.request, "Azure Storage is not configured. Please contact an administrator.")
+            return self.form_invalid(form)
+
+        blob_name = upload_file.name
+
+        try:
+            blob_service = BlobServiceClient.from_connection_string(connection_string)
+            container_name = settings.AZURE_STORAGE_CONTAINER_NAME
+            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
+            # Stream the uploaded file directly to blob storage chunk by chunk to avoid
+            # loading the entire file into memory.
+            blob_client.upload_blob(upload_file, overwrite=True)
+        except Exception as e:
+            LOGGER.exception(f"Failed to upload blob {blob_name}: {e}")
+            messages.error(self.request, f"Upload failed: {blob_name}")
+            return self.form_invalid(form)
+
+        messages.success(self.request, f"File uploaded successfully ({blob_name}). Notification will be sent when processing is complete.")
+        process_uploaded_csv.enqueue(blob_name, fy.financialYear, file_type, self.request.user.username)
+        # Skip UploadView.form_valid (which processes the file locally) and go straight
+        # to the redirect provided by FormView.form_valid.
+        return super(UploadView, self).form_valid(form)

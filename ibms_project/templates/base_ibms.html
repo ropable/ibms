@@ -87,7 +87,9 @@
                             </h5>
                             {% if superuser %}
                                 <li class="nav-item">
-                                    <a class="nav-link" id="superuser_upload" href="{% url 'ibms:upload' %}">Upload</a>
+                                    <a class="nav-link"
+                                       id="superuser_upload"
+                                       href="{% url 'ibms:blob_upload' %}">Upload</a>
                                 </li>
                             {% endif %}
                             <li class="nav-item">
