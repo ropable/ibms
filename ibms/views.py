@@ -89,7 +89,9 @@ class ClearGLPivotView(IbmsFormView):
         if self.request.POST.get("cancel"):
             return redirect(self.get_success_url())
 
-        # Do the bulk delete as a raw SQL query, for performance.
+        # Raw SQL is used here deliberately for performance — the ORM .delete() loads all objects
+        # into memory before deleting, whereas raw SQL issues a single DELETE statement directly.
+        # The parameterised query prevents SQL injection. noqa: S611
         fy = form.cleaned_data["financial_year"]
         count = GLPivDownload.objects.filter(fy=fy).count()
         with connection.cursor() as cursor:
@@ -283,7 +285,7 @@ class CodeUpdateAdminView(IbmsFormView):
 
     template_name = "ibms/code_update_admin.html"
     form_class = ManagerCodeUpdateForm
-    http_method_names = ["get", "head", "options"]
+    http_method_names = ["get", "post", "head", "options"]
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_superuser:
@@ -302,8 +304,8 @@ class CodeUpdateAdminView(IbmsFormView):
 
     def form_valid(self, form):
         fy = form.cleaned_data["financial_year"]
-        ibm = IBMData.objects.filter(fy=fy)
-        gl = GLPivDownload.objects.filter(fy=fy)
+        ibm = IBMData.objects.filter(fy=fy).select_related("fy")
+        gl = GLPivDownload.objects.filter(fy=fy).select_related("fy")
 
         # CC limits both the querysets.
         cc = self.request.POST.get("cost_centre")
@@ -383,7 +385,7 @@ class JSONResponseMixin(object):
         return json.dumps(context)
 
 
-class ServicePriorityMappingJSON(JSONResponseMixin, BaseDetailView):
+class ServicePriorityMappingJSON(LoginRequiredMixin, JSONResponseMixin, BaseDetailView):
     """View to return a filtered list of mappings.
     Cannot use below as we require multiple fields without PKs
     """
@@ -417,7 +419,7 @@ class ServicePriorityMappingJSON(JSONResponseMixin, BaseDetailView):
         return self.render_to_response(context)
 
 
-class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
+class IbmsModelFieldJSON(LoginRequiredMixin, JSONResponseMixin, BaseDetailView):
     """View to return a filtered list of distinct values from a
     defined field for a defined model type, suitable for inserting
     into a select list.
@@ -443,7 +445,7 @@ class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
         if request.GET.get("costCentre", None):
             qs = qs.filter(costCentre=request.GET["costCentre"])
         if request.GET.get("service", None):
-            qs = qs.filter(costCentre=request.GET["service"])
+            qs = qs.filter(service=request.GET["service"])
 
         if request.GET.get("regionBranch", None):
             if self.model == IBMData and request.GET.get("financialYear", None):
@@ -458,8 +460,9 @@ class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
                 qs = qs.filter(regionBranch=request.GET["regionBranch"])
 
         # If we're not after PKs, then we need to reduce the qs to distinct values.
+        # Limit to 500 distinct results to prevent unbounded responses on large tables.
         if not self.return_pk:
-            qs = qs.distinct(self.fieldname)
+            qs = qs.distinct(self.fieldname)[:500]
         choices = []
         for obj in qs:
             # Choice value
@@ -628,7 +631,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
                 raise ValueError("Invalid project sponsor")
             qs = qs.filter(projectSponsor=project_sponsor)
 
-        return qs.order_by("ibmIdentifier")
+        return qs.order_by("ibmIdentifier").select_related("fy")
 
 
 class DataAmendmentUpdate(RevisionMixin, UpdateView):
