@@ -97,6 +97,11 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.GHCR_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,event=branch,branch=dev
+            type=semver,pattern={{version}}
+            type=sha
 
       - name: Set up Docker Context for Buildx
         # This step sets up a Docker context for Buildx.
@@ -220,14 +225,15 @@ jobs:
           images: ${{ env.GHCR_IMAGE }}
           annotations: |
             type=org.opencontainers.image.description,value=${{ github.event.repository.description || 'No description provided' }}
+          # Image tags
+          # latest → default branch (main)
+          # dev → dev branch
+          # Semantic versions from Git tags (v1.2.3)
+          # Always add commit SHA
           tags: |
-            # latest → default branch (main)
             type=raw,value=latest,enable={{is_default_branch}}
-            # dev → dev branch
-            type=raw,value=dev,enable={{startsWith(github.ref, 'refs/heads/dev')}}
-            # Semantic versions from Git tags (v1.2.3)
+            type=raw,value=dev,event=branch,branch=dev
             type=semver,pattern={{version}}
-            # Always add commit SHA
             type=sha
 
       - name: Set up Docker Buildx
