@@ -221,8 +221,14 @@ jobs:
           annotations: |
             type=org.opencontainers.image.description,value=${{ github.event.repository.description || 'No description provided' }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+            # latest → default branch (main)
+            type=raw,value=latest,enable={{is_default_branch}}
+            # dev → dev branch
+            type=raw,value=dev,enable={{startsWith(github.ref, 'refs/heads/dev')}}
+            # Semantic versions from Git tags (v1.2.3)
             type=semver,pattern={{version}}
+            # Always add commit SHA
+            type=sha
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
