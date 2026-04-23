@@ -97,11 +97,6 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.GHCR_IMAGE }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=dev,event=branch,branch=dev
-            type=semver,pattern={{version}}
-            type=sha
 
       - name: Set up Docker Context for Buildx
         # This step sets up a Docker context for Buildx.
