@@ -121,9 +121,9 @@ def ibms_import_from_csv(
     return_str = None
     record_count = 0
     with ctx as reader:
-        for row in reader:
-            record_count += 1
-            if model == GLPivDownload:
+        if model == GLPivDownload:
+            for row in reader:
+                record_count += 1
                 # NOTE: this branch differs from the others, in that it assumes a superuser will first clear existing
                 # GLPivDownload records for a given financial year.
                 # We can't use bulk_create here because it doesn't set the object FK links.
@@ -170,7 +170,9 @@ def ibms_import_from_csv(
                     fireActivities=row[32],
                     mPRACategory=row[33],
                 )
-            elif model == IBMData:
+        elif model == IBMData:
+            for row in reader:
+                record_count += 1
                 return_str = "IBM Data"
                 with create_revision():
                     if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0])).exists():
@@ -223,7 +225,9 @@ def ibms_import_from_csv(
                 # Update any existing GLPivDownload objects that should now link to this object.
                 for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
                     glpiv.save()
-            elif model == CorporateStrategy:
+        elif model == CorporateStrategy:
+            for row in reader:
+                record_count += 1
                 return_str = "IBMS Corporate Strategy"
                 data = {
                     "fy": fy,
@@ -233,7 +237,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "corporateStrategyNo": str(row[0])}
                 _, _ = CorporateStrategy.objects.update_or_create(defaults=data, **query)
-            elif model == NCStrategicPlan:
+        elif model == NCStrategicPlan:
+            for row in reader:
+                record_count += 1
                 return_str = "Nature Conservation"
                 data = {
                     "fy": fy,
@@ -248,7 +254,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "strategicPlanNo": str(row[0])}
                 _, _ = NCStrategicPlan.objects.update_or_create(defaults=data, **query)
-            elif model == DepartmentProgram:
+        elif model == DepartmentProgram:
+            for row in reader:
+                record_count += 1
                 data = {
                     "fy": fy,
                     "ibmIdentifier": validate_char_field("ibmIdentifier", 100, row[0]),
@@ -261,7 +269,9 @@ def ibms_import_from_csv(
                 # Update any GLPivDownload objects that should be linked to this object.
                 for gl in GLPivDownload.objects.filter(fy=fy, codeID=department_program.ibmIdentifier, department_program__isnull=True):
                     gl.save()  # Sets the FK link on save.
-            elif model == GeneralServicePriority:
+        elif model == GeneralServicePriority:
+            for row in reader:
+                record_count += 1
                 data = {
                     "fy": fy,
                     "categoryID": validate_char_field("categoryID", 30, row[0]),
@@ -273,7 +283,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "servicePriorityNo": str(row[1])}
                 _, _ = GeneralServicePriority.objects.update_or_create(defaults=data, **query)
-            elif model == NCServicePriority:
+        elif model == NCServicePriority:
+            for row in reader:
+                record_count += 1
                 return_str = "Nature Conservation Service Priority"
                 data = {
                     "fy": fy,
@@ -292,7 +304,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "servicePriorityNo": str(row[1])}
                 _, _ = NCServicePriority.objects.update_or_create(defaults=data, **query)
-            elif model == PVSServicePriority:
+        elif model == PVSServicePriority:
+            for row in reader:
+                record_count += 1
                 return_str = "Parks & Visitor Services Service Priority"
                 data = {
                     "fy": fy,
@@ -306,8 +320,10 @@ def ibms_import_from_csv(
                     "pvsExampleActNo": str(row[7]),
                 }
                 query = {"fy": fy, "servicePriorityNo": str(row[1])}
-                pv, created = PVSServicePriority.objects.update_or_create(defaults=data, **query)
-            elif model == SFMServicePriority:
+                _, _ = PVSServicePriority.objects.update_or_create(defaults=data, **query)
+        elif model == SFMServicePriority:
+            for row in reader:
+                record_count += 1
                 return_str = "Forest Management Service Priority"
                 data = {
                     "fy": fy,
@@ -321,7 +337,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2])}
                 _, _ = SFMServicePriority.objects.update_or_create(defaults=data, **query)
-            elif model == ERServicePriority:
+        elif model == ERServicePriority:
+            for row in reader:
+                record_count += 1
                 return_str = "Fire Services Service Priority"
                 data = {
                     "fy": fy,
@@ -334,11 +352,9 @@ def ibms_import_from_csv(
                 }
                 query = {"fy": fy, "servicePriorityNo": str(row[1])}
                 _, _ = ERServicePriority.objects.update_or_create(defaults=data, **query)
-            elif model == ServicePriorityMapping:
-                # First, delete any existing ServicePriorityMapping records.
-                query_results = ServicePriorityMapping.objects.filter(fy=fy)
-                if query_results.exists():
-                    query_results.delete()
+        elif model == ServicePriorityMapping:
+            for row in reader:
+                record_count += 1
                 return_str = "Service Priority Mapping"
                 data = {
                     "fy": fy,
@@ -347,13 +363,12 @@ def ibms_import_from_csv(
                     "parksManagement": validate_char_field("parksManagement", 100, row[2]),
                     "forestManagement": validate_char_field("forestManagement", 100, row[3]),
                 }
-                obj = ServicePriorityMapping(**data)
-                obj.save()
+                _, _ = ServicePriorityMapping.objects.update_or_create(**data)
 
-        if not return_str:
-            return model._meta.verbose_name.capitalize(), record_count
-        else:
-            return return_str, record_count
+    if not return_str:
+        return model._meta.verbose_name.capitalize(), record_count
+    else:
+        return return_str, record_count
 
 
 def validate_headers(row, valid_count, headings) -> Literal[True]:
