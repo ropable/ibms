@@ -4,3 +4,4 @@ resources:
   - deployment.yaml
   - deployment_hpa.yaml
   - service.yaml
+  - task_worker.yaml

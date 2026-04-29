@@ -1,22 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ibms-deployment
+  name: ibms-task-worker
   labels:
-    app: ibms-deployment
+    app: ibms-task-worker
 spec:
   selector:
     matchLabels:
-      app: ibms-deployment
+      app: ibms-task-worker
+  replicas: 1
   strategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: ibms-deployment
+        app: ibms-task-worker
     spec:
       containers:
-        - name: ibms
+        - name: ibms-task-worker
           image: ghcr.io/dbca-wa/ibms
           imagePullPolicy: Always
           env:
@@ -29,36 +30,6 @@ spec:
             limits:
               memory: '2Gi'
               cpu: '1000m'
-          startupProbe:
-            httpGet:
-              path: /livez
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 3
-            periodSeconds: 15
-            timeoutSeconds: 10
-            successThreshold: 1
-            failureThreshold: 3
-          livenessProbe:
-            httpGet:
-              path: /livez
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 0
-            periodSeconds: 15
-            successThreshold: 1
-            failureThreshold: 3
-            timeoutSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 0
-            periodSeconds: 15
-            successThreshold: 1
-            failureThreshold: 3
-            timeoutSeconds: 10
           securityContext:
             runAsNonRoot: true
             runAsUser: 65532
@@ -76,7 +47,6 @@ spec:
           emptyDir:
             medium: 'Memory'
       restartPolicy: Always
-      terminationGracePeriodSeconds: 180
       automountServiceAccountToken: false
       tolerations:
         - key: arch
@@ -94,12 +64,3 @@ spec:
                     operator: In
                     values:
                       - arm64
-        # Set a pod anti-affinity to spread workload pods between nodes (preference only).
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 1
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app: ibms-deployment
-                topologyKey: kubernetes.io/hostname
