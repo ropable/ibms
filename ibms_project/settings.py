@@ -172,14 +172,23 @@ LOGGING = {
         },
     },
     "handlers": {
-        "console": {"level": "INFO", "class": "logging.StreamHandler", "stream": sys.stdout, "formatter": "console"},
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "stream": sys.stdout,
+            "formatter": "console",
+        },
     },
     "loggers": {
         "": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
         },
-        "ibms": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "ibms": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
