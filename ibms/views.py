@@ -147,24 +147,19 @@ class UploadView(RevisionMixin, IbmsFormView):
             in_file = StringIO(header_row)
             temp_file.seek(0)
 
+            # Validate the uploaded file.
             try:
-                upload_valid = validate_upload_file(in_file, file_type)
+                validate_upload_file(in_file, file_type)
             except Exception as e:
                 messages.warning(self.request, f"Error: {str(e)}")
                 return super().form_invalid(form)
 
-            # Upload may still not be valid, but at least no exception was thrown.
-            if upload_valid:
-                try:
-                    data_type = process_upload_file(temp_file.name, file_type, fy)
-                    messages.success(self.request, f"{data_type} data imported successfully")
-                except Exception as e:
-                    messages.warning(self.request, f"Error: {str(e)}")
-            else:
-                messages.warning(
-                    self.request,
-                    f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
-                )
+            # Upload may still not be valid data, but at least no exception was thrown.
+            try:
+                data_type = process_upload_file(temp_file.name, file_type, fy)
+                messages.success(self.request, f"{data_type} data imported successfully")
+            except Exception as e:
+                messages.warning(self.request, f"Error: {str(e)}")
 
             return super().form_valid(form)
 
