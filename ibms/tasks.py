@@ -32,7 +32,7 @@ def process_uploaded_csv(blob_name: str, fy: str, file_type: str, username: str)
     connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
     if not connection_string:
         LOGGER.error("process_uploaded_csv: AZURE_STORAGE_CONNECTION_STRING is not set")
-        return
+        return None
 
     container_name = settings.AZURE_STORAGE_CONTAINER_NAME
 
