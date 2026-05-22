@@ -5,9 +5,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
-from sfm.models import FinancialYear
 
 from ibms_project.middleware import get_current_user
+from sfm.models import FinancialYear
 
 User = get_user_model()
 
@@ -118,6 +118,13 @@ class IBMData(models.Model):
         """The project display value should be returned as a string (integer, left-padded with zeros)."""
         if self.project:
             return str(self.project).zfill(4)
+        else:
+            return ""
+
+    def get_job_display(self) -> str:
+        """The job display value should be returned as a string (integer, left-padded with zeros)."""
+        if self.job:
+            return str(self.job).zfill(3)
         else:
             return ""
 
@@ -255,10 +262,11 @@ class GLPivDownload(models.Model):
 
     def get_project_display(self) -> str:
         """The project display value should be returned as a string (integer, left-padded with zeros)."""
-        if self.project:
-            return str(self.project).zfill(4)
-        else:
-            return ""
+        return str(self.project).zfill(4)
+
+    def get_job_display(self) -> str:
+        """The job display value should be returned as a string (integer, left-padded with zeros)."""
+        return str(self.job).zfill(3)
 
 
 class CorporateStrategy(models.Model):

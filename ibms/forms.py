@@ -1,9 +1,19 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Layout, Submit
 from django import forms
-from sfm.models import FinancialYear
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 
-from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
+from ibms.models import (
+    ERServicePriority,
+    GeneralServicePriority,
+    GLPivDownload,
+    IBMData,
+    NCServicePriority,
+    PVSServicePriority,
+    SFMServicePriority,
+)
+from sfm.models import FinancialYear
 
 
 def get_generic_choices(model, key, allow_null=False):
@@ -94,6 +104,8 @@ class UploadForm(FinancialYearFilterForm):
         upload = self.cleaned_data.get("upload_file")
         if upload and upload.content_type not in ["text/plain", "text/csv", "application/vnd.ms-excel"]:
             self._errors["upload_file"] = self.error_class(["File type is not allowed (.csv only)"])
+        if upload and upload.size > settings.MAX_UPLOAD_SIZE:
+            self._errors["upload_file"] = self.error_class([f"File exceeds maximum size of {settings.MAX_UPLOAD_SIZE} bytes"])
         return self.cleaned_data
 
 
@@ -474,6 +486,8 @@ class ListTextWidget(forms.TextInput):
 
 
 class IbmDataForm(forms.ModelForm):
+    """Edit form in use for the Data Amendment view."""
+
     budgetArea = forms.CharField(
         label="Budget area",
         required=True,
@@ -488,7 +502,6 @@ class IbmDataForm(forms.ModelForm):
         choices=[("", "--------")],
         label="Service priority ID",
         required=False,
-        help_text="Must match Service Number e.g. S24 - WM",
     )
     marineKPI = forms.CharField(
         label="Marine KPI",
@@ -532,11 +545,25 @@ class IbmDataForm(forms.ModelForm):
         project_sponsors = sorted(list(project_sponsors))
         self.fields["projectSponsor"].widget = ListTextWidget(name="project_sponsors", data_list=project_sponsors)
 
-        service_priority_ids = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, servicePriorityID__isnull=False)
-            .values_list("servicePriorityID", flat=True)
-            .distinct()
-        )
+        # Service priority ID value options are sourced from a different model, depending on the instances service value.
+        if instance.service == 12:
+            service_priority_ids = (
+                GeneralServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            )
+        elif instance.service == 24:
+            service_priority_ids = NCServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service == 32:
+            service_priority_ids = PVSServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service in [41, 42, 43]:
+            service_priority_ids = SFMServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        elif instance.service in [72, 75]:
+            service_priority_ids = ERServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+        else:
+            service_priority_ids = (
+                IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, servicePriorityID__isnull=False)
+                .values_list("servicePriorityID", flat=True)
+                .distinct()
+            )
         self.fields["servicePriorityID"].choices += sorted([(i, i) for i in service_priority_ids if i])
 
         marine_kpis = (
@@ -566,6 +593,8 @@ class IbmDataForm(forms.ModelForm):
         region_descriptions = sorted(list(region_descriptions))
         self.fields["regionDescription"].widget = ListTextWidget(name="region_description", data_list=region_descriptions)
 
+        self.fields["annualWPInfo"].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
+
         # Readonly fields
         for field in [
             "ibmIdentifier",
@@ -593,8 +622,15 @@ class IbmDataForm(forms.ModelForm):
             "priorityLevel",
         ]:
             self.fields[field].required = False
-            # Use smaller textarea widgets.
-            self.fields[field].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
+            self.fields[field].help_text = "Free text."
+
+        # Use smaller textarea widgets.
+        for field in [
+            "regionalSpecificInfo",
+            "priorityActionNo",
+            "priorityLevel",
+        ]:
+            self.fields[field].widget = forms.Textarea(attrs={"cols": "40", "rows": "1"})
 
         # crispy_forms layout
         self.helper = FormHelper()
@@ -648,3 +684,124 @@ class IbmDataForm(forms.ModelForm):
             "regionDescription",
         ]
         exclude = ["id"]
+
+
+class CodeUpdateCreateForm(forms.ModelForm):
+    """Create form used for the Code Update view."""
+
+    fy = forms.ModelChoiceField(
+        queryset=None,
+        empty_label=None,
+        required=True,
+        disabled=True,
+        label="Financial year",
+    )
+    costCentre = forms.ChoiceField(choices=[("", "--------")], required=True, label="Cost centre")
+    service = forms.ChoiceField(
+        choices=[
+            ("", "--------"),
+            ("12", "12"),
+            ("24", "24"),
+            ("32", "32"),
+            ("41", "41"),
+            ("42", "42"),
+            ("43", "43"),
+            ("72", "72"),
+            ("75", "75"),
+        ],
+        required=True,
+    )
+    save_button = Submit("save", "Save", css_class="btn-lg")
+    cancel_button = Submit("cancel", "Cancel", css_class="btn-secondary")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Take the existing model form fields and apply the required restrictions and validation rules.
+        fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
+        cost_centres = GLPivDownload.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        budget_areas = (
+            IBMData.objects.filter(fy=fy, budgetArea__isnull=False).exclude(budgetArea="").values_list("budgetArea", flat=True).distinct()
+        )
+        budget_areas = sorted(list(budget_areas))
+
+        self.fields["fy"].queryset = FinancialYear.objects.filter(financialYear=kwargs["initial"]["financial_year"])
+        self.fields["fy"].initial = fy
+        self.fields["costCentre"].choices += sorted([(i, i) for i in cost_centres])
+        self.fields["account"].required = True
+        self.fields["account"].validators = [
+            MaxValueValidator(limit_value=99, message="Account value maximum is 99."),
+            MinValueValidator(limit_value=1, message="Account value minimum is 01."),
+        ]
+        self.fields["account"].widget.attrs.update({"min": 1, "max": 99})
+        self.fields["account"].help_text = "Numeric integer, minimum 1, maximum 99."
+        self.fields["activity"].required = True
+        self.fields["activity"].help_text = "Two letters followed by one number or letter."
+        self.fields["activity"].validators = [
+            RegexValidator(
+                regex=r"^[A-Za-z]{2}[A-Za-z0-9]$", message="Activity value must be two letters followed by one number or letter."
+            )
+        ]
+        self.fields["activity"].widget.attrs.update({"placeholder": "---"})
+        self.fields["activity"].widget.attrs.update({"maxlength": "3"})
+        self.fields["activity"].widget.attrs.update({"pattern": "[A-Za-z]{2}[A-Za-z0-9]"})
+        self.fields["project"].required = True
+        self.fields["project"].help_text = "Four characters, alphanumeric."
+        self.fields["project"].validators = [
+            RegexValidator(regex=r"^[A-Za-z0-9]{4}$", message="Project value must be four alphanumeric characters.")
+        ]
+        self.fields["project"].widget.attrs.update({"placeholder": "----"})
+        self.fields["project"].widget.attrs.update({"maxlength": "4"})
+        self.fields["project"].widget.attrs.update({"pattern": "[A-Za-z0-9]{4}"})
+        self.fields["job"].required = True
+        self.fields["job"].help_text = "Three characters, alphanumeric."
+        self.fields["job"].validators = [
+            RegexValidator(regex=r"^[A-Za-z0-9]{3}$", message="Job value must be three alphanumeric characters.")
+        ]
+        self.fields["job"].widget.attrs.update({"placeholder": "---"})
+        self.fields["job"].widget.attrs.update({"maxlength": "3"})
+        self.fields["job"].widget.attrs.update({"pattern": "[A-za-z0-9]{3}"})
+
+        # CharFields using ListTextWidget
+        self.fields["budgetArea"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
+        self.fields["budgetArea"].help_text = "Free text. Click to display list of existing values."
+
+        # crispy_forms layout
+        self.helper = FormHelper()
+        self.helper.form_class = "form-horizontal"
+        self.helper.label_class = "col-xs-12 col-sm-4 col-md-2"
+        self.helper.field_class = "col-xs-12 col-sm-8 col-md-10"
+        self.helper.help_text_inline = True
+        self.helper.layout = Layout(
+            "fy",
+            "costCentre",
+            "account",
+            "service",
+            "activity",
+            "project",
+            "job",
+            "budgetArea",
+            Div(self.save_button, self.cancel_button, css_class="col-sm-offset-4 col-md-offset-3 col-lg-offset-2"),
+        )
+
+    class Meta:
+        model = IBMData
+        fields = [
+            "fy",
+            "costCentre",
+            "account",
+            "service",
+            "activity",
+            "project",
+            "job",
+            "budgetArea",
+        ]
+        exclude = ["id"]
+
+    def clean(self):
+        # Business rule: users may not input activity DJ0.
+        if "activity" in self.cleaned_data and self.cleaned_data["activity"].lower() == "dj0":
+            self._errors["activity"] = self.error_class(
+                ["IBMS information for activity DJ0 (Bushfire) is system generated, not available for user input."]
+            )
+
+        return self.cleaned_data

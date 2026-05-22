@@ -1,0 +1,35 @@
+{% extends "base_ibms.html" %}
+{% load static crispy_forms_tags %}
+{% block page_content_inner %}
+    <div class="row py-1">
+        <div class="col">
+            <h1>{{ title }}</h1>
+            <p>
+                Downloads as of: <strong>{{ download_period }}</strong>
+            </p>
+            <p>Please click on either of the two options below.</p>
+            <div class="alert alert-primary hover-pointer"
+                 role="alert"
+                 id="id_option_one">
+                <strong>Option 1</strong>: click the link below to download a spreadsheet used to bulk-create records.
+            </div>
+            <div id="id_template_link" class="initially-hidden">
+                <p>
+                    <a href="{{ sharepoint_ibms }}Shared Documents/IBMS Admin/IBMS Code Update.xlsx?download=1"
+                       target="_blank">IBMS Code Update template download</a>
+                </p>
+            </div>
+            <div class="alert alert-primary hover-pointer"
+                 role="alert"
+                 id="id_option_two">
+                <strong>Option 2</strong>: use the form below to enter new IBM data directly.
+            </div>
+            <div id="id_code_update_form" class="initially-hidden">{% crispy form %}</div>
+            {% if form_invalid %}<div id="id_form_invalid"></div>{% endif %}
+        </div>
+    </div>
+{% endblock %}
+{% block extra_js %}
+    {{ javascript_context|json_script:"javascript_context" }}
+    <script type="text/javascript" src="{% static 'js/code_update_create.js' %}"></script>
+{% endblock %}

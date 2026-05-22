@@ -1,4 +1,6 @@
 import csv
+import logging
+from typing import List, Optional
 
 from django import forms
 from django.contrib.admin import ModelAdmin, register
@@ -21,23 +23,30 @@ from .models import (
     SFMServicePriority,
 )
 
+LOGGER = logging.getLogger("ibms")
 
-def export_as_csv_action(fields=None, translations=None, exclude=None, header=True, description="Export selected objects to CSV"):
+
+def export_as_csv_action(
+    fields: Optional[List[str]] = None,
+    translations: Optional[List[str]] = None,
+    exclude: Optional[List[str]] = None,
+    header: bool = True,
+    description: str = "Export selected objects to CSV",
+):
     """
     This function adds an "Export as CSV" action to a model in the Django admin site.
     Register the action using the ModelAdmin ``action`` option.
     ``fields`` and ``exclude`` work the same as those Django ModelForm options (use one or the other).
     ``header`` defines whether or not the column names are output as the first row.
-
-    Ref: http://djangosnippets.org/snippets/2020/
     """
 
     def export_as_csv(modeladmin, request, queryset):
         """
         Generic csv export admin action.
         """
-        opts = modeladmin.model._meta
-        field_names = [field.name for field in opts.fields]
+        # Basic audit logging.
+        LOGGER.info(f"{queryset.model._meta.verbose_name} CSV export by {request.user.username}: {queryset.count()} records")
+        field_names = [field.name for field in modeladmin.model._meta.fields]
         if fields:
             field_names = fields
         elif exclude:
@@ -45,8 +54,7 @@ def export_as_csv_action(fields=None, translations=None, exclude=None, header=Tr
             field_names = [f for f in field_names if f not in excludeset]
         # Create the response object.
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename={0}.csv".format(str(opts).replace(".", "_"))
-        # Write the CSV to the response object.
+        response["Content-Disposition"] = f"attachment; filename=ibms_{modeladmin.model._meta.model_name}.csv"
         writer = csv.writer(response)
         if header:
             writer.writerow(list(translations))
@@ -105,8 +113,8 @@ class IBMDataAdmin(VersionAdmin):
                     "account_display",
                     "service",
                     "activity",
-                    "project",
-                    "job",
+                    "project_display",
+                    "job_display",
                     "priorityActionNo",
                     "priorityLevel",
                     "marineKPI",
@@ -177,11 +185,21 @@ class IBMDataAdmin(VersionAdmin):
 
     account_display.short_description = "account"
 
+    def project_display(self, obj):
+        return obj.get_project_display()
+
+    project_display.short_description = "project"
+
+    def job_display(self, obj):
+        return obj.get_job_display()
+
+    job_display.short_description = "job"
+
     def service_priority_link(self, obj):
         if obj.service_priority:
             named_url = f"admin:ibms_{obj.content_type.model}_change"
             url = reverse(named_url, args=[obj.object_id])
-            return format_html(f"<a href='{url}'>{obj.service_priority.servicePriorityNo}</a>")
+            return format_html(format_string=f"<a href='{url}'>{obj.service_priority.servicePriorityNo}</a>")
         else:
             return ""
 
@@ -368,7 +386,7 @@ class GLPivDownloadAdmin(ModelAdmin):
     def ibmdata_link(self, obj):
         if obj.ibmdata:
             url = reverse("admin:ibms_ibmdata_change", args=[obj.ibmdata.pk])
-            return format_html(f"<a href='{url}'>{obj.ibmdata.ibmIdentifier}</a>")
+            return format_html(format_string=f"<a href='{url}'>{obj.ibmdata.ibmIdentifier}</a>")
         else:
             return ""
 
@@ -377,7 +395,7 @@ class GLPivDownloadAdmin(ModelAdmin):
     def department_program_link(self, obj):
         if obj.department_program:
             url = reverse("admin:ibms_departmentprogram_change", args=[obj.department_program.pk])
-            return format_html(f"<a href='{url}'>{obj.department_program.dept_program1}</a>")
+            return format_html(format_string=f"<a href='{url}'>{obj.department_program.dept_program1}</a>")
         else:
             return ""
 
@@ -419,7 +437,7 @@ class NCStrategicPlanAdmin(ModelAdmin):
     ]
     readonly_fields = ["fy", "strategicPlanNo"]
     list_filter = ["fy__financialYear"]
-    list_display = ["strategicPlanNo", "fy", "directionNo", "direction"]
+    list_display = ["fy", "strategicPlanNo", "directionNo", "direction"]
     search_fields = ["strategicPlanNo", "direction"]
     actions = [
         export_as_csv_action(
@@ -465,7 +483,7 @@ class ServicePriorityAdmin(ModelAdmin):
     def corporate_strategy_link(self, obj):
         if obj.corporate_strategy:
             url = reverse("admin:ibms_corporatestrategy_change", args=[obj.corporate_strategy.pk])
-            return format_html(f"<a href='{url}'>{obj.corporate_strategy.corporateStrategyNo}</a>")
+            return format_html(format_string=f"<a href='{url}'>{obj.corporate_strategy.corporateStrategyNo}</a>")
         else:
             return ""
 
@@ -474,7 +492,7 @@ class ServicePriorityAdmin(ModelAdmin):
     def strategic_plan_link(self, obj):
         if obj.strategic_plan:
             url = reverse("admin:ibms_ncstrategicplan_change", args=[obj.strategic_plan.pk])
-            return format_html(f"<a href='{url}'>{obj.strategic_plan.strategicPlanNo}</a>")
+            return format_html(format_string=f"<a href='{url}'>{obj.strategic_plan.strategicPlanNo}</a>")
         else:
             return ""
 

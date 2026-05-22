@@ -2,9 +2,10 @@ from django.urls import path
 
 from ibms.models import GLPivDownload, IBMData, ServicePriorityMapping
 from ibms.views import (
+    BlobUploadView,
     ClearGLPivotView,
     CodeUpdateAdminView,
-    CodeUpdateView,
+    CodeUpdateCreateView,
     DataAmendmentList,
     DataAmendmentUpdate,
     DownloadDeptProgramView,
@@ -18,10 +19,11 @@ from ibms.views import (
 app_name = "ibms"
 urlpatterns = [
     path("upload/", UploadView.as_view(), name="upload"),
+    path("upload-blob/", BlobUploadView.as_view(), name="blob_upload"),
     path("download/", DownloadView.as_view(), name="download"),
     path("download-enhanced/", DownloadEnhancedView.as_view(), name="download_enhanced"),
     path("download-dept-program/", DownloadDeptProgramView.as_view(), name="download_dept_program"),
-    path("code-update/", CodeUpdateView.as_view(), name="code_update"),
+    path("code-update/", CodeUpdateCreateView.as_view(), name="code_update"),
     path("code-update-admin/", CodeUpdateAdminView.as_view(), name="code_update_admin"),
     path("data-amendment/", DataAmendmentList.as_view(), name="data_amendment_list"),
     path("data-amendment/<int:pk>/", DataAmendmentUpdate.as_view(), name="data_amendment_update"),

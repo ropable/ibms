@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ibms-task-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: ibms-task-worker
+          command: ['python']
+          args: ['manage.py', 'db_worker']
+          envFrom:
+            - secretRef:
+                name: ibms-env-prod

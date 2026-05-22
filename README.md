@@ -41,6 +41,17 @@ Run console commands manually:
 
     python manage.py shell_plus
 
+## Testing
+
+Run unit tests as follows:
+
+    python manage.py test --keepdb -v2 --failfast
+
+To obtain test coverage:
+
+    coverage run --source='.' manage.py test --keepdb -v2 --failfast
+    coverage report -m
+
 ## Docker image
 
 To build a new Docker image from the `Dockerfile`:

@@ -1,27 +1,43 @@
 import json
+import logging
 import os
 import tempfile
+from io import StringIO
 
+from azure.storage.blob import BlobServiceClient
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import FieldDoesNotExist
+from django.db import connection
 from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
-from django.views.generic import ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import BaseDetailView
 from django.views.generic.edit import FormMixin, FormView
 from reversion import set_comment
 from reversion.views import RevisionMixin
-from sfm.models import FinancialYear
 from xlrd import open_workbook
 from xlutils.copy import copy as copy_xl
 
-from ibms.forms import ClearGLPivotForm, DownloadForm, IbmDataFilterForm, IbmDataForm, ManagerCodeUpdateForm, UploadForm
+from ibms.forms import (
+    ClearGLPivotForm,
+    CodeUpdateCreateForm,
+    DownloadForm,
+    IbmDataFilterForm,
+    IbmDataForm,
+    ManagerCodeUpdateForm,
+    UploadForm,
+)
 from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
+from ibms.tasks import process_uploaded_csv
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
+from sfm.models import FinancialYear
+
+LOGGER = logging.getLogger("ibms")
 
 
 class SiteHomeView(LoginRequiredMixin, TemplateView):
@@ -59,11 +75,11 @@ class ClearGLPivotView(IbmsFormView):
 
     form_class = ClearGLPivotForm
 
-    def get(self, request, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         if not request.user.is_superuser:
             messages.error(self.request, "You are not authorised to carry out this operation")
             return redirect(self.get_success_url())
-        return super().get(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -75,18 +91,19 @@ class ClearGLPivotView(IbmsFormView):
         return reverse("site_home")
 
     def form_valid(self, form):
-        if not self.request.user.is_superuser:
-            messages.error(self.request, "You are not authorised to carry out this operation.")
-            return self.get_success_url()
         if self.request.POST.get("cancel"):
             return redirect(self.get_success_url())
-        # Do the bulk delete. We can use the private method _raw_delete because we don't
-        # have any signals or cascade deletes to worry about.
+
+        # Raw SQL is used here deliberately for performance — the ORM .delete() loads all objects
+        # into memory before deleting, whereas raw SQL issues a single DELETE statement directly.
+        # The parameterised query prevents SQL injection. noqa: S611
         fy = form.cleaned_data["financial_year"]
-        glpiv = GLPivDownload.objects.filter(fy=fy)
-        if glpiv.exists():
-            glpiv._raw_delete(glpiv.db)
-            messages.success(self.request, f"GL Pivot entries for {fy} have been cleared.")
+        count = GLPivDownload.objects.filter(fy=fy).count()
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM ibms_glpivdownload WHERE fy_id = %s", [fy.financialYear])
+
+        messages.success(self.request, f"Deleted {count} GL Pivot entries for {fy}")
+
         return super().form_valid(form)
 
 
@@ -111,40 +128,40 @@ class UploadView(RevisionMixin, IbmsFormView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Uploaded CSVs may contain characters with oddball encodings.
-        # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
-        # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
-        # in a consistent fashion.
-        t = tempfile.NamedTemporaryFile()
-        for chunk in form.cleaned_data["upload_file"].chunks():
-            t.write(chunk.decode("utf-8", "ignore").encode())
-        t.flush()
-        # We have to open the uploaded file in text mode to parse it.
-        file = open(t.name, "r")
+        fy = form.cleaned_data["financial_year"]
         file_type = form.cleaned_data["upload_file_type"]
 
-        # Catch exception thrown by the upload validation process and display it to the user.
-        try:
-            upload_valid = validate_upload_file(file, file_type)
-        except Exception as e:
-            messages.warning(self.request, f"Error: {str(e)}")
-            return super().form_invalid(form)
+        with tempfile.NamedTemporaryFile(mode="w+b", delete=True) as temp_file:
+            # Uploaded CSVs may contain characters with oddball Windows encodings.
+            # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
+            # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
+            # in a consistent fashion.
+            for chunk in form.cleaned_data["upload_file"].chunks():
+                temp_file.write(chunk.decode("utf-8", "ignore").encode())
+            temp_file.flush()
+            temp_file.seek(0)
 
-        # Upload may still not be valid, but at least no exception was thrown.
-        if upload_valid:
-            fy = form.cleaned_data["financial_year"]
+            # Extract the first row of the CSV for the purpose of validating the columns.
+            header_row = temp_file.readline()
+            header_row = header_row.decode()
+            in_file = StringIO(header_row)
+            temp_file.seek(0)
+
+            # Validate the uploaded file.
             try:
-                data_type = process_upload_file(file.name, file_type, fy)
+                validate_upload_file(in_file, file_type)
+            except Exception as e:
+                messages.warning(self.request, f"Error: {str(e)}")
+                return super().form_invalid(form)
+
+            # Upload may still not be valid data, but at least no exception was thrown.
+            try:
+                data_type = process_upload_file(temp_file.name, file_type, fy)
                 messages.success(self.request, f"{data_type} data imported successfully")
             except Exception as e:
                 messages.warning(self.request, f"Error: {str(e)}")
-        else:
-            messages.warning(
-                self.request,
-                f"This file appears to be of an incorrect type. Please choose a {file_type} file.",
-            )
 
-        return super().form_valid(form)
+            return super().form_valid(form)
 
 
 class DownloadView(IbmsFormView):
@@ -268,7 +285,7 @@ class CodeUpdateAdminView(IbmsFormView):
 
     template_name = "ibms/code_update_admin.html"
     form_class = ManagerCodeUpdateForm
-    http_method_names = ["get", "head", "options"]
+    http_method_names = ["get", "post", "head", "options"]
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_superuser:
@@ -287,8 +304,8 @@ class CodeUpdateAdminView(IbmsFormView):
 
     def form_valid(self, form):
         fy = form.cleaned_data["financial_year"]
-        ibm = IBMData.objects.filter(fy=fy)
-        gl = GLPivDownload.objects.filter(fy=fy)
+        ibm = IBMData.objects.filter(fy=fy).select_related("fy")
+        gl = GLPivDownload.objects.filter(fy=fy).select_related("fy")
 
         # CC limits both the querysets.
         cc = self.request.POST.get("cost_centre")
@@ -357,14 +374,18 @@ class JSONResponseMixin(object):
 
     def get_json_response(self, content, **httpresponse_kwargs):
         "Construct an `HttpResponse` object."
-        return HttpResponse(content, content_type="application/json", **httpresponse_kwargs)
+        response = HttpResponse(content, content_type="application/json", **httpresponse_kwargs)
+        # Include CSP headers in response.
+        response["X-Content-Type-Options"] = "nosniff"
+        response["X-Frame-Options"] = "DENY"
+        return response
 
     def convert_context_to_json(self, context):
         "Convert the context dictionary into a JSON object"
         return json.dumps(context)
 
 
-class ServicePriorityMappingJSON(JSONResponseMixin, BaseDetailView):
+class ServicePriorityMappingJSON(LoginRequiredMixin, JSONResponseMixin, BaseDetailView):
     """View to return a filtered list of mappings.
     Cannot use below as we require multiple fields without PKs
     """
@@ -398,7 +419,7 @@ class ServicePriorityMappingJSON(JSONResponseMixin, BaseDetailView):
         return self.render_to_response(context)
 
 
-class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
+class IbmsModelFieldJSON(LoginRequiredMixin, JSONResponseMixin, BaseDetailView):
     """View to return a filtered list of distinct values from a
     defined field for a defined model type, suitable for inserting
     into a select list.
@@ -413,15 +434,18 @@ class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
     def get(self, request, *args, **kwargs):
         # Sanity check: if the model hasn't got that field, return a
         # HTTPResponseBadRequest response.
-        if not hasattr(self.model, self.fieldname):
+        try:
+            self.model._meta.get_field(self.fieldname)
+        except FieldDoesNotExist:
             return HttpResponseBadRequest(f"Invalid field name: {self.fieldname}")
+
         qs = self.model.objects.all()
         if request.GET.get("financialYear", None):
             qs = qs.filter(fy__financialYear=request.GET["financialYear"])
         if request.GET.get("costCentre", None):
             qs = qs.filter(costCentre=request.GET["costCentre"])
         if request.GET.get("service", None):
-            qs = qs.filter(costCentre=request.GET["service"])
+            qs = qs.filter(service=request.GET["service"])
 
         if request.GET.get("regionBranch", None):
             if self.model == IBMData and request.GET.get("financialYear", None):
@@ -436,8 +460,9 @@ class IbmsModelFieldJSON(JSONResponseMixin, BaseDetailView):
                 qs = qs.filter(regionBranch=request.GET["regionBranch"])
 
         # If we're not after PKs, then we need to reduce the qs to distinct values.
+        # Limit to 500 distinct results to prevent unbounded responses on large tables.
         if not self.return_pk:
-            qs = qs.distinct(self.fieldname)
+            qs = qs.distinct(self.fieldname)[:500]
         choices = []
         for obj in qs:
             # Choice value
@@ -465,6 +490,7 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
     http_method_names = ["get", "head", "options"]
     form_class = IbmDataFilterForm
     template_name = "ibms/data_amendment_list.html"
+    paginate_by = 1000  # Precaution: set an upper bound on a queryset that returns data. We should never exceed this.
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -524,65 +550,98 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         return context
 
     def get_queryset(self):
-        qs = super().get_queryset()
 
-        # Financial year
+        # Financial year (in operation, we don't allow end-users to change this and default to the current FY)
         if self.request.GET.get("financial_year"):
             fy = FinancialYear.objects.get(financialYear=self.request.GET["financial_year"])
         else:
             # Filter by the newest financial year.
             fy = FinancialYear.objects.order_by("-financialYear").first()
 
-        qs = qs.filter(fy=fy)
+        qs = IBMData.objects.filter(fy=fy)
+
+        # Short-circuit: if we don't have either CC or region/branch filters, return an empty queryset.
+        if not (self.request.GET.get("cost_centre", None) or self.request.GET.get("region", None)):
+            return qs.none()
 
         # Business rule: exclude activity == "DJ0".
         qs = qs.exclude(activity="DJ0")
         # Business rule: exclude records with an empty budgetArea.
         qs = qs.exclude(budgetArea="")
 
-        # If we don't have either CC or region/branch filters, return an empty queryset.
-        if not (self.request.GET.get("cost_centre", None) or self.request.GET.get("region", None)):
-            return qs.none()
-
         # Cost centre
         if self.request.GET.get("cost_centre", None):
-            qs = qs.filter(costCentre=self.request.GET["cost_centre"])
+            # Validate the cost_centre value that was passed in.
+            cost_centre = self.request.GET["cost_centre"]
+            valid_cc_set = IBMData.objects.values_list("costCentre", flat=True).distinct()
+            if cost_centre not in valid_cc_set:
+                raise ValueError("Invalid cost centre")
+            qs = qs.filter(costCentre=cost_centre)
 
         # Region/branch
         if self.request.GET.get("region", None):
             # As regionBranch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
             # then use those values to filter the IBMData queryset.
             region_branch = self.request.GET["region"]
-            cost_centres = set(GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True))
+            cost_centres = GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True).distinct()
             qs = qs.filter(costCentre__in=cost_centres)
 
         # Service
         if self.request.GET.get("service", None):
-            qs = qs.filter(service=self.request.GET["service"])
+            # Validate the service value that was passed in.
+            service = self.request.GET["service"]
+            valid_service_set = IBMData.objects.values_list("service", flat=True).distinct()
+            if service not in valid_service_set:
+                raise ValueError("Invalid service")
+            qs = qs.filter(service=service)
 
         # Project
         if self.request.GET.get("project", None):
-            qs = qs.filter(project=self.request.GET["project"])
+            # Validate the project value that was passed in.
+            project = self.request.GET["project"]
+            valid_project_set = IBMData.objects.values_list("project", flat=True).distinct()
+            if project not in valid_project_set:
+                raise ValueError("Invalid project")
+            qs = qs.filter(project=project)
 
         # Job
         if self.request.GET.get("job", None):
-            qs = qs.filter(job=self.request.GET["job"])
+            # Validate the job value that was passed in.
+            job = self.request.GET["job"]
+            valid_job_set = IBMData.objects.values_list("job", flat=True).distinct()
+            if job not in valid_job_set:
+                raise ValueError("Invalid job")
+            qs = qs.filter(job=job)
 
         # Budget area
         if self.request.GET.get("budget_area", None):
-            qs = qs.filter(budgetArea=self.request.GET["budget_area"])
+            # Validate the budget_area value that was passed in.
+            budget_area = self.request.GET["budget_area"]
+            valid_budget_set = IBMData.objects.values_list("budgetArea", flat=True).distinct()
+            if budget_area not in valid_budget_set:
+                raise ValueError("Invalid budget area")
+            qs = qs.filter(budgetArea=budget_area)
 
         # Project sponsor
         if self.request.GET.get("project_sponsor", None):
-            qs = qs.filter(projectSponsor=self.request.GET["project_sponsor"])
+            # Validate the project_sponsor value that was passed in.
+            project_sponsor = self.request.GET["project_sponsor"]
+            valid_sponsor_set = IBMData.objects.values_list("projectSponsor", flat=True).distinct()
+            if project_sponsor not in valid_sponsor_set:
+                raise ValueError("Invalid project sponsor")
+            qs = qs.filter(projectSponsor=project_sponsor)
 
-        return qs.order_by("ibmIdentifier")
+        return qs.order_by("ibmIdentifier").select_related("fy")
 
 
 class DataAmendmentUpdate(RevisionMixin, UpdateView):
+    """An edit view to allow users to make changes to individual IBMData objects.
+    At present, no additional authorisation checks are performed (all users can edit all records).
+    """
+
     model = IBMData
     form_class = IbmDataForm
-    http_method_names = ["get", "post", "put", "patch", "head", "options"]
+    http_method_names = ["get", "post", "head", "options"]
     template_name = "ibms/data_amendment_update.html"
 
     def get_context_data(self, **kwargs):
@@ -593,6 +652,16 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         context["page_title"] = f"{settings.SITE_ACRONYM} | Edit IBM data {obj.ibmIdentifier}"
         context["title"] = f"EDIT IBM DATA {obj.ibmIdentifier}"
         return context
+
+    def get_form_kwargs(self):
+        # Set default values in some non-editable form fields for display purposes.
+        kwargs = super().get_form_kwargs()
+        obj = self.get_object()
+        kwargs["initial"]["account"] = obj.get_account_display()
+        kwargs["initial"]["service"] = obj.get_service_display()
+        kwargs["initial"]["project"] = obj.get_project_display()
+        kwargs["initial"]["job"] = obj.get_job_display()
+        return kwargs
 
     def get_success_url(self):
         if self.request.GET.get("_changelist_filters"):
@@ -609,4 +678,114 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         obj = self.get_object()
         messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
         set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
+        # Find any matching GLPivDownload records and set the FK link.
+        for glpiv in GLPivDownload.objects.filter(fy=obj.fy, codeID=obj.ibmIdentifier, ibmdata__isnull=True):
+            glpiv.save()
         return super().form_valid(form)
+
+
+class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
+    """A create view to allow users to manually generate an IBMData object via a form."""
+
+    model = IBMData
+    form_class = CodeUpdateCreateForm
+    http_method_names = ["get", "post", "head", "options"]
+    template_name = "ibms/code_update_create.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.user.is_superuser:
+            context["superuser"] = True
+        context["download_period"] = get_download_period()
+        context["page_title"] = f"{settings.SITE_ACRONYM} | Code update"
+        context["title"] = "CODE UPDATE"
+        # Additional context injected to the template for JavaScript UI.
+        context["javascript_context"] = {
+            "ajax_ibmdata_budgetarea_url": reverse("ibms:ajax_ibmdata_budgetarea"),
+        }
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+
+        # Always provide a default FY.
+        if "financial_year" not in self.request.GET:
+            fy = FinancialYear.objects.order_by("-financialYear").first()
+            kwargs["initial"]["financial_year"] = fy.financialYear
+
+        return kwargs
+
+    def form_invalid(self, form):
+        # Provide some extra context on the rendered view to assist with GUI behaviour.
+        context = self.get_context_data(form=form)
+        context["form_invalid"] = True
+        return self.render_to_response(context)
+
+    def form_valid(self, form):
+        # Override a couple of form field values on save.
+        new_ibmdata = form.save(commit=False)
+
+        # Uppercase the activity, project and job fields.
+        new_ibmdata.activity = new_ibmdata.activity.upper()
+        new_ibmdata.project = new_ibmdata.project.upper()
+        new_ibmdata.job = new_ibmdata.job.upper()
+        # Cast the account and service fields as string and left-pad them with zeroes.
+        new_ibmdata.account = str(new_ibmdata.account).zfill(2)
+        new_ibmdata.service = str(new_ibmdata.service).zfill(2)
+        # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
+        new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
+
+        # Short-circuit: if a matching IBMData record exists, return to that object view instead.
+        if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
+            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
+            messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
+            return redirect(existing_ibmdata.get_absolute_url())
+
+        new_ibmdata.save()
+        messages.success(self.request, f"IBM data {new_ibmdata} has been created")
+
+        # Find any matching GLPivDownload records and set the FK link.
+        for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier, ibmdata__isnull=True):
+            glpiv.save()
+
+        return super().form_valid(form)
+
+
+class BlobUploadView(UploadView):
+    """Extends UploadView to stream the uploaded CSV directly to Azure Blob Storage
+    instead of processing it locally. Requires the AZURE_STORAGE_CONNECTION_STRING
+    environment variable to be set. AZURE_STORAGE_CONTAINER_NAME must also be
+    defined in settings.
+    """
+
+    def get_success_url(self):
+        return reverse("ibms:blob_upload")
+
+    def form_valid(self, form):
+        fy = form.cleaned_data["financial_year"]
+        file_type = form.cleaned_data["upload_file_type"]
+        upload_file = form.cleaned_data["upload_file"]
+        connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        if not connection_string:
+            messages.error(self.request, "Azure Storage is not configured. Please contact an administrator.")
+            return self.form_invalid(form)
+
+        blob_name = upload_file.name
+
+        try:
+            blob_service = BlobServiceClient.from_connection_string(connection_string)
+            container_name = settings.AZURE_STORAGE_CONTAINER_NAME
+            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
+            # Stream the uploaded file directly to blob storage chunk by chunk to avoid
+            # loading the entire file into memory.
+            blob_client.upload_blob(upload_file, overwrite=True)
+        except Exception as e:
+            LOGGER.exception(f"Failed to upload blob {blob_name}: {e}")
+            messages.error(self.request, f"Upload failed: {blob_name}")
+            return self.form_invalid(form)
+
+        messages.success(self.request, f"File uploaded successfully ({blob_name}). Notification will be sent when processing is complete.")
+        process_uploaded_csv.enqueue(blob_name, fy.financialYear, file_type, self.request.user.username)
+        # Skip UploadView.form_valid (which processes the file locally) and go straight
+        # to the redirect provided by FormView.form_valid.
+        return super(UploadView, self).form_valid(form)

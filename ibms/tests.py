@@ -1,4 +1,4 @@
-from uuid import uuid1
+from random import randint
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -33,10 +33,22 @@ class IbmsTestCase(TestCase):
         self.ibmdata = mixer.blend(
             IBMData,
             fy=self.fy,
-            ibmIdentifier=str(uuid1()),
+            account=randint(1, 99),
+            service=randint(10, 99),
             costCentre="999",
             budgetArea="Admin",
             activity="AA1",
+            project="AA11",
+            job="ABC",
             projectSponsor=self.fake.name(),
         )
         self.client.login(username="testuser", password="test")
+
+    def _create_user(self, username):
+        """Helper to create a non-admin user"""
+
+        User = get_user_model()
+        return User.objects.create_user(
+            username=username,
+            password="test",
+        )
