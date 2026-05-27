@@ -97,7 +97,7 @@ jobs:
         # The metadata includes information such as the image name, tags, and labels.
         # The metadata will be used later in the workflow to build and push the Docker image.
         id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
         with:
           images: ${{ env.GHCR_IMAGE }}
 
@@ -121,7 +121,7 @@ jobs:
       - name: Login to GitHub Container Registry
         # This step logs in to the GitHub Container Registry (GHCR) using the docker/login-action.
         # It uses the GitHub actor's username and the GITHUB_TOKEN secret for authentication.
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -130,7 +130,7 @@ jobs:
       - name: Log in to Docker Hardened Images Registry
         # This step logs into the Docker Hardened Images Registry in order to download the required images.
         # It uses Actions secrets that must be set on the repository in GitHub.
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: dhi.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -144,7 +144,7 @@ jobs:
         # The cache-from and cache-to options are used to enable caching for the build process.
         # The cache is stored in GitHub Actions cache and is scoped to the repository, branch, and platform.
         id: build
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         env:
           DOCKER_BUILDKIT: 1
         with:
@@ -218,7 +218,7 @@ jobs:
         # It uses the docker/metadata-action to create metadata based on the repository information.
         # The metadata includes information such as the image name, tags, and labels.
         id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
         with:
           images: ${{ env.GHCR_IMAGE }}
           annotations: |
@@ -242,7 +242,7 @@ jobs:
             network=host
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         # This step logs in to the GitHub Container Registry (GHCR) using the docker/login-action.
         # It uses the GitHub actor's username and the GITHUB_TOKEN secret for authentication.
         # The login is necessary to push the merged manifest list to GHCR.
@@ -322,6 +322,6 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
       - name: Upload scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4
         with:
           sarif_file: 'trivy-results.sarif'
