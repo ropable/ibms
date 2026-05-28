@@ -6,8 +6,8 @@ IBMS (Integrated Business Management System) is a Django 5.2 corporate applicati
 
 The project has two Django apps:
 
-- **`ibms`** — core business logic: GL pivot data, IBM data, service priorities, code updates, data amendments, Excel upload/download
-- **`sfm`** — Service and Finance Metrics: cost centres, financial years, quarters, SFM metrics, measurement values
+- **`ibms`** — core business logic: GL pivot data, IBM data, financial years, service priorities, code updates, data amendments, Excel upload/download
+- **`sfm`** — Service and Finance Metrics: cost centres, quarters, SFM metrics, measurement values
 
 Project configuration lives in **`ibms_project/`** (settings, urls, middleware, signals, context processors).
 
@@ -24,12 +24,12 @@ Project configuration lives in **`ibms_project/`** (settings, urls, middleware, 
 - **Authentication**: Django auth + DBCA SSO via `dbca_utils.middleware.SSOLoginMiddleware`
 - **Linting**: `ruff` (line length 140); `djlint` for templates
 - **Testing**: Django `TestCase`, `mixer` for model instances, `Faker` for fake data
+- **Infrastructure as Code:** Kubernetes manifests in `kustomize/`
 
 ## Conventions
 
 ### Models
 
-- Field names use **camelCase** (e.g., `costCentre`, `financialYear`, `ibmIdentifier`, `budgetArea`) — this is intentional, not a mistake
 - Use `DEFAULT_AUTO_FIELD = "django.db.models.AutoField"` (integer PKs, not BigAutoField)
 - Audit fields (`modifier`, `modified`) use `get_current_user()` from `ibms_project.middleware`
 - Use `on_delete=models.PROTECT` unless there is a specific reason to cascade
@@ -88,8 +88,6 @@ Always activate the virtualenv before running any Python command:
 source .venv/bin/activate
 ```
 
-
-
 - Test files: `test_models.py`, `test_views.py`, `test_forms.py`, `test_utils.py` in the `ibms` app; `tests.py` in `sfm`
 - All test cases extend `IbmsTestCase` (from `ibms.tests`) which provides `self.fake`, `self.admin`, `self.user`, `self.fy`, `self.ibmdata`, and a logged-in client
 - Use `mixer.blend(ModelClass, field=value)` to create test model instances
@@ -102,7 +100,6 @@ source .venv/bin/activate
 - Health endpoints: `GET /livez` (liveness) and `GET /readyz` (readiness with DB check) — handled by `HealthCheckMiddleware`, not Django URL routing
 - Docker: built with `uv`, runs as `nonroot` user on port 8080 via gunicorn
 - Static files collected at image build time with `collectstatic`
-- Kubernetes manifests in `kustomize/`
 
 ## What Not to Do
 
