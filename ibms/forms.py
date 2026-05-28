@@ -13,7 +13,7 @@ from ibms.models import (
     PVSServicePriority,
     SFMServicePriority,
 )
-from sfm.models import FinancialYear
+from ibms.models import FinancialYear
 
 
 def get_generic_choices(model, key, allow_null=False):

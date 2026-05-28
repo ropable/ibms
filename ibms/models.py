@@ -7,9 +7,18 @@ from django.db import models
 from django.urls import reverse
 
 from ibms_project.middleware import get_current_user
-from sfm.models import FinancialYear
 
 User = get_user_model()
+
+
+class FinancialYear(models.Model):
+    financialYear = models.CharField(max_length=10, primary_key=True, verbose_name="financial year")
+
+    class Meta:
+        ordering = ("financialYear",)
+
+    def __str__(self):
+        return self.financialYear
 
 
 class IBMData(models.Model):

@@ -13,6 +13,7 @@ from .models import (
     CorporateStrategy,
     DepartmentProgram,
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -66,6 +67,14 @@ def export_as_csv_action(
 
     export_as_csv.short_description = description
     return export_as_csv
+
+
+@register(FinancialYear)
+class FinancialYearAdmin(ModelAdmin):
+    search_fields = ["financialYear"]
+    list_display = ["financialYear"]
+    list_filter = ["financialYear"]
+    actions = [export_as_csv_action(translations=["financialYear"], fields=["financialYear"])]
 
 
 @register(IBMData)

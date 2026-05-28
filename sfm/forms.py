@@ -1,8 +1,9 @@
 from crispy_forms.layout import HTML, Div, Layout, Submit
 from django import forms
-from sfm.models import REGION_CHOICES, CostCentre, FinancialYear, MeasurementValue, Quarter, SFMMetric
+from sfm.models import REGION_CHOICES, CostCentre, MeasurementValue, Quarter, SFMMetric
 
 from ibms.forms import HelperForm
+from ibms.models import FinancialYear
 
 
 class QtrModelChoiceField(forms.ModelChoiceField):
