@@ -80,7 +80,15 @@ Project configuration lives in **`ibms_project/`** (settings, urls, middleware, 
 - Use `export_as_csv_action()` helper for CSV export admin actions
 - Register with `@register(ModelName)` decorator
 
-## Testing
+## Running Python Commands
+
+Always activate the virtualenv before running any Python command:
+
+```bash
+source .venv/bin/activate
+```
+
+
 
 - Test files: `test_models.py`, `test_views.py`, `test_forms.py`, `test_utils.py` in the `ibms` app; `tests.py` in `sfm`
 - All test cases extend `IbmsTestCase` (from `ibms.tests`) which provides `self.fake`, `self.admin`, `self.user`, `self.fy`, `self.ibmdata`, and a logged-in client
