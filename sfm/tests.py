@@ -1,8 +1,9 @@
 from django.test.client import Client
 from django.urls import reverse
 from mixer.backend.django import mixer
-from sfm.models import CostCentre, FinancialYear, MeasurementType, MeasurementValue, Quarter, SFMMetric
+from sfm.models import CostCentre, MeasurementType, MeasurementValue, Quarter, SFMMetric
 
+from ibms.models import FinancialYear
 from ibms.tests import IbmsTestCase
 
 

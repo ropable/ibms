@@ -2,7 +2,7 @@ from django.contrib.admin import ModelAdmin, SimpleListFilter, register
 
 from ibms.admin import export_as_csv_action
 
-from .models import CostCentre, FinancialYear, MeasurementValue, Outcomes, Quarter, SFMMetric
+from .models import CostCentre, MeasurementValue, Outcomes, Quarter, SFMMetric
 
 
 @register(CostCentre)
@@ -13,15 +13,6 @@ class CostCentreAdmin(ModelAdmin):
     actions = [
         export_as_csv_action(translations=["costCentre", "name", "region"], fields=["costCentre", "name", "region"]),
     ]
-
-
-@register(FinancialYear)
-class FinancialYearAdmin(ModelAdmin):
-    search_fields = ["financialYear"]
-    list_display = ["financialYear"]
-    list_filter = ["financialYear"]
-    actions = [export_as_csv_action(translations=["financialYear"], fields=["financialYear"])]
-
 
 @register(SFMMetric)
 class SFMMetricAdmin(ModelAdmin):

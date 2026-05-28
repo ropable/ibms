@@ -11,6 +11,7 @@ from ibms.models import (
     CorporateStrategy,
     DepartmentProgram,
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -21,7 +22,6 @@ from ibms.models import (
     SFMServicePriority,
 )
 from ibms.tests import IbmsTestCase
-from sfm.models import FinancialYear
 
 
 class IbmsViewsTest(IbmsTestCase):

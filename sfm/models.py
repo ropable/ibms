@@ -1,5 +1,7 @@
 from django.db import models
 
+from ibms.models import FinancialYear
+
 REGION_CHOICES = [
     ("Goldfields", "Goldfields"),
     ("Kimberley", "Kimberley"),
@@ -25,16 +27,6 @@ class CostCentre(models.Model):
         if self.name:
             return f"{self.costCentre} - {self.name}"
         return self.costCentre
-
-
-class FinancialYear(models.Model):
-    financialYear = models.CharField(max_length=10, primary_key=True, verbose_name="financial year")
-
-    class Meta:
-        ordering = ("financialYear",)
-
-    def __str__(self):
-        return self.financialYear
 
 
 class SFMMetric(models.Model):
