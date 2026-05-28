@@ -9,7 +9,7 @@ def outputs_report(workbook, sfm, spn, dp, fy, qtr, cc):
     sheet = workbook.active
     # Insert values in header area.
     sheet["B2"] = qtr.description
-    sheet["C2"] = fy.financialYear
+    sheet["C2"] = fy.financial_year
     sheet["B3"] = cc.costCentre
     sheet["E3"] = dp
     curr = '"$"#,##0_);("$"#,##'  # An Excel currency format.
@@ -20,28 +20,28 @@ def outputs_report(workbook, sfm, spn, dp, fy, qtr, cc):
     # and insert values as required.
     for s in spn:
         # Where there are no SFMServicePriority objects for the given
-        # servicePriorityNo and financialYear, skip the priority no.
-        if not SFMServicePriority.objects.filter(servicePriorityNo=s, fy=fy.financialYear).exists():
+        # service_priority_no and financial_year, skip the priority no.
+        if not SFMServicePriority.objects.filter(service_priority_no=s, fy=fy.financial_year).exists():
             continue
         sfm_metrics = sfm.filter(servicePriorityNo=s)
-        sfm_service_pri = SFMServicePriority.objects.get(servicePriorityNo=s, fy=fy.financialYear)
-        ibm_data = IBMData.objects.filter(fy=fy.financialYear, servicePriorityID=s, costCentre=cc.costCentre)
-        ibm_ids = set(ibm_data.values_list("ibmIdentifier", flat=True))
-        gl = GLPivDownload.objects.filter(fy=fy.financialYear, costCentre=cc.costCentre, codeID__in=ibm_ids)
+        sfm_service_pri = SFMServicePriority.objects.get(service_priority_no=s, fy=fy.financial_year)
+        ibm_data = IBMData.objects.filter(fy=fy.financial_year, service_priority_id=s, cost_centre=cc.costCentre)
+        ibm_ids = set(ibm_data.values_list("ibm_identifier", flat=True))
+        gl = GLPivDownload.objects.filter(fy=fy.financial_year, cost_centre=cc.costCentre, code_id__in=ibm_ids)
         for k, metric in enumerate(sfm_metrics):  # Subquery
             if k == 0:  # First row only of subquery.
-                cell = sheet.cell(column=1, row=row, value=sfm_service_pri.servicePriorityNo)
+                cell = sheet.cell(column=1, row=row, value=sfm_service_pri.service_priority_no)
                 cell.alignment = wrapped
                 cell = sheet.cell(column=2, row=row, value=sfm_service_pri.description)
                 cell.alignment = wrapped
                 cell = sheet.cell(column=3, row=row, value=sfm_service_pri.description2)
                 cell.alignment = wrapped
-                ytd_a = gl.aggregate(Sum("ytdActual"))
-                cell = sheet.cell(column=4, row=row, value=ytd_a["ytdActual__sum"])
+                ytd_a = gl.aggregate(Sum("ytd_actual"))
+                cell = sheet.cell(column=4, row=row, value=ytd_a["ytd_actual__sum"])
                 cell.number_format = curr
                 cell.alignment = wrapped
-                ytd_b = gl.aggregate(Sum("ytdBudget"))
-                cell = sheet.cell(column=5, row=row, value=ytd_b["ytdBudget__sum"])
+                ytd_b = gl.aggregate(Sum("ytd_budget"))
+                cell = sheet.cell(column=5, row=row, value=ytd_b["ytd_budget__sum"])
                 cell.number_format = curr
                 cell.alignment = wrapped
             cell = sheet.cell(column=6, row=row, value=metric.metricID)

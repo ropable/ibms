@@ -16,15 +16,15 @@ class IBMDataTest(IbmsTestCase):
         sp = mixer.blend(
             GeneralServicePriority,
             fy=self.fy,
-            servicePriorityNo=self.ibmdata.servicePriorityID,
+            service_priority_no=self.ibmdata.service_priority_id,
         )
 
         result = self.ibmdata.get_service_priority()
-        self.assertEqual(result.servicePriorityNo, sp.servicePriorityNo)
+        self.assertEqual(result.service_priority_no, sp.service_priority_no)
 
     def test_get_service_priority_no_match(self):
         """Test when no service priority exists"""
-        self.ibmdata.servicePriorityID = "NONEXISTENT_SP"
+        self.ibmdata.service_priority_id = "NONEXISTENT_SP"
 
         result = self.ibmdata.get_service_priority()
         self.assertIsNone(result)
@@ -34,7 +34,7 @@ class IBMDataTest(IbmsTestCase):
         sp = mixer.blend(
             GeneralServicePriority,
             fy=self.fy,
-            servicePriorityNo=self.ibmdata.servicePriorityID,
+            service_priority_no=self.ibmdata.service_priority_id,
         )
         self.ibmdata.service_priority = sp
         self.ibmdata.save()
@@ -47,12 +47,12 @@ class IBMDataTest(IbmsTestCase):
         sp = mixer.blend(
             GeneralServicePriority,
             fy=self.fy,
-            servicePriorityNo="TEST_SP_001",
+            service_priority_no="TEST_SP_001",
         )
         new_ibm = mixer.blend(
             IBMData,
             fy=self.fy,
-            servicePriorityID=sp.servicePriorityNo,
+            service_priority_id=sp.service_priority_no,
         )
         new_ibm.save()
 
@@ -122,8 +122,8 @@ class IBMDataTest(IbmsTestCase):
         gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID=self.ibmdata.ibmIdentifier,
-            regionBranch="Test Region",
+            code_id=self.ibmdata.ibm_identifier,
+            region_branch="Test Region",
         )
 
         self.assertEqual(self.ibmdata.get_region_branch(), "Test Region")
@@ -137,14 +137,14 @@ class IBMDataTest(IbmsTestCase):
         mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID=self.ibmdata.ibmIdentifier,
-            regionBranch="First Region",
+            code_id=self.ibmdata.ibm_identifier,
+            region_branch="First Region",
         )
         mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID=self.ibmdata.ibmIdentifier,
-            regionBranch="Second Region",
+            code_id=self.ibmdata.ibm_identifier,
+            region_branch="Second Region",
         )
 
         self.assertEqual(self.ibmdata.get_region_branch(), "First Region")
@@ -160,9 +160,9 @@ class GLPivDownloadTest(IbmsTestCase):
         self.gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            downloadPeriod="15/03/2024",
+            download_period_str="15/03/2024",
             download_period=None,
-            codeID=self.ibmdata.ibmIdentifier,
+            code_id=self.ibmdata.ibm_identifier,
             account=5,
             project="42",
             job="7",
@@ -173,8 +173,8 @@ class GLPivDownloadTest(IbmsTestCase):
         new_gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID=self.ibmdata.ibmIdentifier,
-            downloadPeriod="15/03/2024",
+            code_id=self.ibmdata.ibm_identifier,
+            download_period_str="15/03/2024",
             ibmdata=None,
         )
         new_gl.save()
@@ -187,8 +187,8 @@ class GLPivDownloadTest(IbmsTestCase):
         new_gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID="NONEXISTENT",
-            downloadPeriod="15/03/2024",
+            code_id="NONEXISTENT",
+            download_period_str="15/03/2024",
             ibmdata=None,
         )
         new_gl.save()
@@ -201,13 +201,13 @@ class GLPivDownloadTest(IbmsTestCase):
         dept = mixer.blend(
             DepartmentProgram,
             fy=self.fy,
-            ibmIdentifier=self.ibmdata.ibmIdentifier,
+            ibm_identifier=self.ibmdata.ibm_identifier,
         )
         new_gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            codeID=self.ibmdata.ibmIdentifier,
-            downloadPeriod="15/03/2024",
+            code_id=self.ibmdata.ibm_identifier,
+            download_period_str="15/03/2024",
             department_program=None,
         )
         new_gl.save()
@@ -216,11 +216,11 @@ class GLPivDownloadTest(IbmsTestCase):
         self.assertEqual(new_gl.department_program, dept)
 
     def test_save_parse_download_period_date(self):
-        """Verify save() parses downloadPeriod string to download_period date"""
+        """Verify save() parses download_period_str string to download_period date"""
         new_gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            downloadPeriod="15/03/2024",
+            download_period_str="15/03/2024",
             download_period=None,
         )
         new_gl.save()
@@ -235,7 +235,7 @@ class GLPivDownloadTest(IbmsTestCase):
         new_gl = mixer.blend(
             GLPivDownload,
             fy=self.fy,
-            downloadPeriod="2024-03-15",  # Invalid format
+            download_period_str="2024-03-15",  # Invalid format
             download_period=None,
         )
         new_gl.save()
@@ -261,7 +261,7 @@ class GLPivDownloadTest(IbmsTestCase):
 
     def test_get_ibmdata_not_found(self):
         """Verify get_ibmdata() returns None when no match"""
-        self.gl.codeID = "NONEXISTENT"
+        self.gl.code_id = "NONEXISTENT"
         result = self.gl.get_ibmdata()
         self.assertIsNone(result)
 
@@ -270,14 +270,14 @@ class GLPivDownloadTest(IbmsTestCase):
         dept = mixer.blend(
             DepartmentProgram,
             fy=self.fy,
-            ibmIdentifier=self.ibmdata.ibmIdentifier,
+            ibm_identifier=self.ibmdata.ibm_identifier,
         )
         result = self.gl.get_department_program()
         self.assertEqual(result, dept)
 
     def test_get_department_program_not_found(self):
         """Verify get_department_program() returns None when no match"""
-        self.gl.codeID = "NONEXISTENT"
+        self.gl.code_id = "NONEXISTENT"
         result = self.gl.get_department_program()
         self.assertIsNone(result)
 

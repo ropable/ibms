@@ -12,13 +12,13 @@ User = get_user_model()
 
 
 class FinancialYear(models.Model):
-    financialYear = models.CharField(max_length=10, primary_key=True, verbose_name="financial year")
+    financial_year = models.CharField(max_length=10, primary_key=True, verbose_name="financial year")
 
     class Meta:
-        ordering = ("financialYear",)
+        ordering = ("financial_year",)
 
     def __str__(self):
-        return self.financialYear
+        return self.financial_year
 
 
 class IBMData(models.Model):
@@ -26,27 +26,27 @@ class IBMData(models.Model):
     and Data Amendment templates by end users.
     """
 
-    ibmIdentifier = models.CharField(max_length=100, verbose_name="IBM identifier", db_index=True)
+    ibm_identifier = models.CharField(max_length=100, verbose_name="IBM identifier", db_index=True)
 
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    costCentre = models.CharField(max_length=4, null=True, blank=True, db_index=True, verbose_name="cost centre")
+    cost_centre = models.CharField(max_length=4, null=True, blank=True, db_index=True, verbose_name="cost centre")
 
     service = models.IntegerField(null=True, blank=True, db_index=True)
     project = models.CharField(max_length=6, null=True, blank=True)
     job = models.CharField(max_length=6, null=True, blank=True)
-    budgetArea = models.CharField(max_length=100, db_index=True, verbose_name="budget area")
-    projectSponsor = models.CharField(max_length=100, db_index=True, verbose_name="project sponsor")
+    budget_area = models.CharField(max_length=100, db_index=True, verbose_name="budget area")
+    project_sponsor = models.CharField(max_length=100, db_index=True, verbose_name="project sponsor")
 
     activity = models.CharField(max_length=4, null=True, blank=True)
     account = models.IntegerField(null=True, blank=True)
-    regionalSpecificInfo = models.TextField(verbose_name="regional specific info")
-    servicePriorityID = models.CharField(max_length=100, verbose_name="service priority ID")
-    annualWPInfo = models.TextField(verbose_name="annual WP info")
-    priorityActionNo = models.TextField(null=True, verbose_name="priority action no")
-    priorityLevel = models.TextField(null=True, verbose_name="priority level")
-    marineKPI = models.TextField(null=True, verbose_name="marine KPI")
-    regionProject = models.TextField(null=True, verbose_name="region project")
-    regionDescription = models.TextField(null=True, verbose_name="region description")
+    regional_specific_info = models.TextField(verbose_name="regional specific info")
+    service_priority_id = models.CharField(max_length=100, verbose_name="service priority ID")
+    annual_wp_info = models.TextField(verbose_name="annual WP info")
+    priority_action_no = models.TextField(null=True, verbose_name="priority action no")
+    priority_level = models.TextField(null=True, verbose_name="priority level")
+    marine_kpi = models.TextField(null=True, verbose_name="marine KPI")
+    region_project = models.TextField(null=True, verbose_name="region project")
+    region_description = models.TextField(null=True, verbose_name="region description")
 
     # Audit fields
     modifier = models.ForeignKey(
@@ -66,13 +66,13 @@ class IBMData(models.Model):
     service_priority = GenericForeignKey("content_type", "object_id")
 
     class Meta:
-        unique_together = [("ibmIdentifier", "fy")]
+        unique_together = [("ibm_identifier", "fy")]
         verbose_name = "IBM data"
         verbose_name_plural = "IBM data"
         indexes = [models.Index(fields=["content_type", "object_id"])]
 
     def __str__(self):
-        return f"{self.fy} {self.ibmIdentifier}"
+        return f"{self.fy} {self.ibm_identifier}"
 
     def save(self, *args, **kwargs):
         user = get_current_user()
@@ -103,7 +103,7 @@ class IBMData(models.Model):
 
         # NOTE: the order of model classes is important here, as GeneralServicePriority should be preferenced.
         for model in [GeneralServicePriority, NCServicePriority, PVSServicePriority, SFMServicePriority, ERServicePriority]:
-            qs = model.objects.filter(fy=self.fy, servicePriorityNo=self.servicePriorityID)
+            qs = model.objects.filter(fy=self.fy, service_priority_no=self.service_priority_id)
             if qs:
                 return qs.first()
 
@@ -140,20 +140,20 @@ class IBMData(models.Model):
     def get_region_branch(self) -> str:
         """This value belongs to linked GLPivDownload objects."""
         if self.glpivdownload.exists():
-            return str(self.glpivdownload.first().regionBranch)
+            return str(self.glpivdownload.first().region_branch)
         else:
             return ""
 
 
 class DepartmentProgram(models.Model):
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    ibmIdentifier = models.CharField(max_length=100, verbose_name="IBM identifer", db_index=True)
+    ibm_identifier = models.CharField(max_length=100, verbose_name="IBM identifer", db_index=True)
     dept_program1 = models.CharField(max_length=500, verbose_name="department program 1", null=True, blank=True)
     dept_program2 = models.CharField(max_length=500, verbose_name="department program 2", null=True, blank=True)
     dept_program3 = models.CharField(max_length=500, verbose_name="department program 3", null=True, blank=True)
 
     class Meta:
-        unique_together = [("ibmIdentifier", "fy")]
+        unique_together = [("ibm_identifier", "fy")]
 
     def __str__(self):
         return f"{self.fy} {self.dept_program1}"
@@ -161,7 +161,7 @@ class DepartmentProgram(models.Model):
 
 class GLPivDownload(models.Model):
     """GLPivDownload source is from WebReporting data (Finance Service Branch).
-    The link between IBMData to GLPivDownload is the codeID column ie. concatenate of CC-Account-Service-Activity-Project-Job.
+    The link between IBMData to GLPivDownload is the code_id column ie. concatenate of CC-Account-Service-Activity-Project-Job.
     There are instances where a line transaction (IBM ID) in IBM data does not have a match with IBM ID in GLPivotDownload
     (as there isn't any transaction yet (no YTD actual/FY budget). It will come through later in the financial year.
 
@@ -169,48 +169,48 @@ class GLPivDownload(models.Model):
     """
 
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year", editable=False)
-    costCentre = models.CharField(max_length=4, db_index=True, verbose_name="cost centre", editable=False)
-    regionBranch = models.CharField(max_length=100, db_index=True, verbose_name="region branch", editable=False)
+    cost_centre = models.CharField(max_length=4, db_index=True, verbose_name="cost centre", editable=False)
+    region_branch = models.CharField(max_length=100, db_index=True, verbose_name="region branch", editable=False)
     service = models.IntegerField(db_index=True, editable=False)
     project = models.CharField(max_length=6, editable=False)
     job = models.CharField(max_length=6, editable=False)
 
     download_period = models.DateField(blank=True, null=True, editable=False)
-    downloadPeriod = models.CharField(max_length=10, editable=False)
+    download_period_str = models.CharField(max_length=10, editable=False)
     account = models.IntegerField(db_index=True, editable=False)
     activity = models.CharField(max_length=4, db_index=True, editable=False)
     resource = models.IntegerField(db_index=True, editable=False)
-    shortCode = models.CharField(max_length=20, verbose_name="short code", editable=False)
-    shortCodeName = models.CharField(max_length=200, verbose_name="short code name", editable=False)
-    gLCode = models.CharField(max_length=30, verbose_name="GL code", editable=False)
-    ptdActual = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
-    ptdBudget = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
-    ytdActual = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
-    ytdBudget = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    short_code = models.CharField(max_length=20, verbose_name="short code", editable=False)
+    short_code_name = models.CharField(max_length=200, verbose_name="short code name", editable=False)
+    gl_code = models.CharField(max_length=30, verbose_name="GL code", editable=False)
+    ptd_actual = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    ptd_budget = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    ytd_actual = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    ytd_budget = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
     fybudget = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
-    ytdVariance = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
-    ccName = models.CharField(max_length=100, verbose_name="CC name", editable=False)
-    serviceName = models.CharField(max_length=100, verbose_name="service name", editable=False)
-    activityName = models.CharField(max_length=100, verbose_name="activity name", editable=False)
-    resourceName = models.CharField(max_length=100, verbose_name="resource name", editable=False)
-    projectName = models.CharField(max_length=100, verbose_name="project name", editable=False)
-    jobName = models.CharField(max_length=100, verbose_name="job name", editable=False)
-    codeID = models.CharField(
+    ytd_variance = models.DecimalField(max_digits=14, decimal_places=2, editable=False)
+    cc_name = models.CharField(max_length=100, verbose_name="CC name", editable=False)
+    service_name = models.CharField(max_length=100, verbose_name="service name", editable=False)
+    activity_name = models.CharField(max_length=100, verbose_name="activity name", editable=False)
+    resource_name = models.CharField(max_length=100, verbose_name="resource name", editable=False)
+    project_name = models.CharField(max_length=100, verbose_name="project name", editable=False)
+    job_name = models.CharField(max_length=100, verbose_name="job name", editable=False)
+    code_id = models.CharField(
         max_length=30,
         db_index=True,
         verbose_name="code ID",
         help_text="This should match an IBMData object's IBMIdentifier field.",
         editable=False,
     )
-    resNameNo = models.CharField(max_length=100, editable=False)
-    actNameNo = models.CharField(max_length=100, editable=False)
-    projNameNo = models.CharField(max_length=100, editable=False)
+    res_name_no = models.CharField(max_length=100, editable=False)
+    act_name_no = models.CharField(max_length=100, editable=False)
+    proj_name_no = models.CharField(max_length=100, editable=False)
     division = models.CharField(max_length=100, db_index=True, editable=False)
-    resourceCategory = models.CharField(max_length=100, verbose_name="resource category", editable=False)
+    resource_category = models.CharField(max_length=100, verbose_name="resource category", editable=False)
     wildfire = models.CharField(max_length=30, editable=False)
-    expenseRevenue = models.CharField(max_length=7, verbose_name="expense revenue", editable=False)
-    fireActivities = models.CharField(max_length=50, verbose_name="fire activities", editable=False)
-    mPRACategory = models.CharField(max_length=100, editable=False)
+    expense_revenue = models.CharField(max_length=7, verbose_name="expense revenue", editable=False)
+    fire_activities = models.CharField(max_length=50, verbose_name="fire activities", editable=False)
+    mpra_category = models.CharField(max_length=100, editable=False)
 
     ibmdata = models.ForeignKey(
         IBMData,
@@ -231,18 +231,18 @@ class GLPivDownload(models.Model):
     )
 
     class Meta:
-        unique_together = [("gLCode", "fy")]
+        unique_together = [("gl_code", "fy")]
         verbose_name = "GL pivot download"
         verbose_name_plural = "GL pivot downloads"
 
     def __str__(self):
-        return f"{self.fy} {self.gLCode}"
+        return f"{self.fy} {self.gl_code}"
 
     def save(self, *args, **kwargs):
         # Parse string date to a Python date, if needed.
-        if self.downloadPeriod and not self.download_period:
+        if self.download_period_str and not self.download_period:
             try:
-                self.download_period = datetime.strptime(self.downloadPeriod, "%d/%m/%Y")
+                self.download_period = datetime.strptime(self.download_period_str, "%d/%m/%Y")
             except ValueError:
                 pass
         # Set a linked IBMData object, if present.
@@ -255,14 +255,14 @@ class GLPivDownload(models.Model):
 
     def get_ibmdata(self) -> IBMData | None:
         """Returns a single matched IBMData object, if it exists."""
-        if IBMData.objects.filter(fy=self.fy, ibmIdentifier=self.codeID).exists():
-            return IBMData.objects.get(fy=self.fy, ibmIdentifier=self.codeID)
+        if IBMData.objects.filter(fy=self.fy, ibm_identifier=self.code_id).exists():
+            return IBMData.objects.get(fy=self.fy, ibm_identifier=self.code_id)
         return None
 
     def get_department_program(self) -> DepartmentProgram | None:
         """Returns a single matched DepartmentProgram object, if it exists."""
-        if DepartmentProgram.objects.filter(fy=self.fy, ibmIdentifier=self.codeID).exists():
-            return DepartmentProgram.objects.get(fy=self.fy, ibmIdentifier=self.codeID)
+        if DepartmentProgram.objects.filter(fy=self.fy, ibm_identifier=self.code_id).exists():
+            return DepartmentProgram.objects.get(fy=self.fy, ibm_identifier=self.code_id)
         return None
 
     def get_account_display(self) -> str:
@@ -280,15 +280,15 @@ class GLPivDownload(models.Model):
 
 class CorporateStrategy(models.Model):
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    corporateStrategyNo = models.CharField(max_length=100, verbose_name="corporate strategy no")
+    corporate_strategy_no = models.CharField(max_length=100, verbose_name="corporate strategy no")
     description1 = models.TextField(null=True)
     description2 = models.TextField(null=True)
 
     def __str__(self):
-        return f"{self.fy} {self.corporateStrategyNo}"
+        return f"{self.fy} {self.corporate_strategy_no}"
 
     class Meta:
-        unique_together = [("corporateStrategyNo", "fy")]
+        unique_together = [("corporate_strategy_no", "fy")]
         verbose_name_plural = "corporate strategies"
 
 
@@ -296,22 +296,22 @@ class NCStrategicPlan(models.Model):
     """Notwithstanding the name of this model, all subclasses of ServicePriority may link to it."""
 
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    strategicPlanNo = models.CharField(max_length=100, verbose_name="strategic plan no")
-    directionNo = models.CharField(max_length=100, verbose_name="direction no")
+    strategic_plan_no = models.CharField(max_length=100, verbose_name="strategic plan no")
+    direction_no = models.CharField(max_length=100, verbose_name="direction no")
     direction = models.TextField()
-    aimNo = models.CharField(max_length=100, verbose_name="aim no")
+    aim_no = models.CharField(max_length=100, verbose_name="aim no")
     aim1 = models.TextField()
     aim2 = models.TextField()
-    actionNo = models.TextField(verbose_name="action no")
+    action_no = models.TextField(verbose_name="action no")
     action = models.TextField()
 
     class Meta:
-        unique_together = [("strategicPlanNo", "fy")]
+        unique_together = [("strategic_plan_no", "fy")]
         verbose_name = "NC strategic plan"
         verbose_name_plural = "NC strategic plans"
 
     def __str__(self):
-        return f"{self.fy} {self.strategicPlanNo}"
+        return f"{self.fy} {self.strategic_plan_no}"
 
 
 class ServicePriority(models.Model):
@@ -320,13 +320,13 @@ class ServicePriority(models.Model):
     """
 
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    categoryID = models.CharField(max_length=100, null=True, blank=True, db_index=True, verbose_name="category ID")
-    servicePriorityNo = models.CharField(max_length=100, null=False, default="-1", db_index=True, verbose_name="service priority no")
-    strategicPlanNo = models.CharField(max_length=100, null=True, blank=True, verbose_name="strategic plan no")
-    corporateStrategyNo = models.CharField(max_length=100, null=True, blank=True, verbose_name="corporate strategy no")
+    category_id = models.CharField(max_length=100, null=True, blank=True, db_index=True, verbose_name="category ID")
+    service_priority_no = models.CharField(max_length=100, null=False, default="-1", db_index=True, verbose_name="service priority no")
+    strategic_plan_no = models.CharField(max_length=100, null=True, blank=True, verbose_name="strategic plan no")
+    corporate_strategy_no = models.CharField(max_length=100, null=True, blank=True, verbose_name="corporate strategy no")
     description = models.TextField(null=True)
-    pvsExampleAnnWP = models.TextField()
-    pvsExampleActNo = models.TextField()
+    pvs_example_ann_wp = models.TextField()
+    pvs_example_act_no = models.TextField()
 
     corporate_strategy = models.ForeignKey(
         CorporateStrategy,
@@ -345,10 +345,10 @@ class ServicePriority(models.Model):
 
     class Meta:
         abstract = True
-        unique_together = [("servicePriorityNo", "fy")]
+        unique_together = [("service_priority_no", "fy")]
 
     def __str__(self):
-        return f"{self.fy} {self.servicePriorityNo}"
+        return f"{self.fy} {self.service_priority_no}"
 
     def save(self, *args, **kwargs):
         # Set a linked CorporateStrategy object, if present.
@@ -361,14 +361,14 @@ class ServicePriority(models.Model):
 
     def get_corporate_strategy(self) -> CorporateStrategy | None:
         """Returns a single matched CorporateStrategy object, if it exists."""
-        if CorporateStrategy.objects.filter(fy=self.fy, corporateStrategyNo=self.corporateStrategyNo).exists():
-            return CorporateStrategy.objects.get(fy=self.fy, corporateStrategyNo=self.corporateStrategyNo)
+        if CorporateStrategy.objects.filter(fy=self.fy, corporate_strategy_no=self.corporate_strategy_no).exists():
+            return CorporateStrategy.objects.get(fy=self.fy, corporate_strategy_no=self.corporate_strategy_no)
         return None
 
     def get_strategic_plan(self) -> NCStrategicPlan | None:
         """Returns a single matched NCStrategicPlan object, if it exists."""
-        if NCStrategicPlan.objects.filter(fy=self.fy, strategicPlanNo=self.strategicPlanNo).exists():
-            return NCStrategicPlan.objects.get(fy=self.fy, strategicPlanNo=self.strategicPlanNo)
+        if NCStrategicPlan.objects.filter(fy=self.fy, strategic_plan_no=self.strategic_plan_no).exists():
+            return NCStrategicPlan.objects.get(fy=self.fy, strategic_plan_no=self.strategic_plan_no)
         return None
 
     def get_d1(self) -> str:
@@ -411,13 +411,13 @@ class GeneralServicePriority(ServicePriority):
 
 
 class NCServicePriority(ServicePriority):
-    assetNo = models.CharField(max_length=5, verbose_name="asset no")
+    asset_no = models.CharField(max_length=5, verbose_name="asset no")
     asset = models.TextField()
-    targetNo = models.CharField(max_length=30, verbose_name="target no")
+    target_no = models.CharField(max_length=30, verbose_name="target no")
     target = models.TextField()
-    actionNo = models.CharField(max_length=30, verbose_name="action no")
+    action_no = models.CharField(max_length=30, verbose_name="action no")
     action = models.TextField()
-    mileNo = models.CharField(max_length=30, verbose_name="mile no")
+    mile_no = models.CharField(max_length=30, verbose_name="mile no")
     milestone = models.TextField()
 
     # NOTE: we need to redefine the FK fields on each child model due to Django reverse query name clash.
@@ -452,7 +452,7 @@ class NCServicePriority(ServicePriority):
 
 
 class PVSServicePriority(ServicePriority):
-    servicePriority1 = models.TextField(verbose_name="service priority 1")
+    service_priority_1 = models.TextField(verbose_name="service priority 1")
 
     # NOTE: we need to redefine the FK fields on each child model due to Django reverse query name clash.
     corporate_strategy = models.ForeignKey(
@@ -479,14 +479,14 @@ class PVSServicePriority(ServicePriority):
         verbose_name_plural = "PVS service priorities"
 
     def get_d1(self) -> str:
-        return str(self.servicePriority1)
+        return str(self.service_priority_1)
 
     def get_d2(self) -> str:
         return str(self.description)
 
 
 class SFMServicePriority(ServicePriority):
-    regionBranch = models.CharField(max_length=20, verbose_name="region branch")
+    region_branch = models.CharField(max_length=20, verbose_name="region branch")
     description2 = models.TextField()
 
     # NOTE: we need to redefine the FK fields on each child model due to Django reverse query name clash.
@@ -553,10 +553,10 @@ class ERServicePriority(ServicePriority):
 
 class Outcome(models.Model):
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    q1Input = models.TextField()
-    q2Input = models.TextField(blank=True)
-    q3Input = models.TextField(blank=True)
-    q4Input = models.TextField(blank=True)
+    q1_input = models.TextField()
+    q2_input = models.TextField(blank=True)
+    q3_input = models.TextField(blank=True)
+    q4_input = models.TextField(blank=True)
 
     def __str__(self):
         return str(self.fy)
@@ -564,10 +564,10 @@ class Outcome(models.Model):
 
 class ServicePriorityMapping(models.Model):
     fy = models.ForeignKey(FinancialYear, on_delete=models.PROTECT, verbose_name="financial year")
-    costCentreNo = models.CharField(max_length=4, verbose_name="cost centre no")
-    wildlifeManagement = models.CharField(max_length=100, verbose_name="wildlife management")
-    parksManagement = models.CharField(max_length=100, verbose_name="parks management")
-    forestManagement = models.CharField(max_length=100, verbose_name="forest management")
+    cost_centre_no = models.CharField(max_length=4, verbose_name="cost centre no")
+    wildlife_management = models.CharField(max_length=100, verbose_name="wildlife management")
+    parks_management = models.CharField(max_length=100, verbose_name="parks management")
+    forest_management = models.CharField(max_length=100, verbose_name="forest management")
 
     def __str__(self):
-        return str(self.costCentreNo)
+        return str(self.cost_centre_no)

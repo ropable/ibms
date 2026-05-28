@@ -16,12 +16,12 @@ class CostCentreAdmin(ModelAdmin):
 
 @register(SFMMetric)
 class SFMMetricAdmin(ModelAdmin):
-    search_fields = ["fy__financialYear", "region", "servicePriorityNo", "metricID"]
+    search_fields = ["fy__financial_year", "region", "servicePriorityNo", "metricID"]
     list_display = ["fy", "region", "servicePriorityNo", "metricID"]
     list_filter = ["fy", "region", "servicePriorityNo"]
     actions = [
         export_as_csv_action(
-            translations=["financialYear", "region", "servicePriorityNo", "metricID", "descriptor", "example"],
+            translations=["financial_year", "region", "servicePriorityNo", "metricID", "descriptor", "example"],
             fields=["fy", "region", "servicePriorityNo", "metricID", "descriptor", "example"],
         )
     ]
@@ -29,10 +29,10 @@ class SFMMetricAdmin(ModelAdmin):
 
 @register(Quarter)
 class QuarterAdmin(ModelAdmin):
-    search_fields = ["fy__financialYear", "quarter", "description"]
+    search_fields = ["fy__financial_year", "quarter", "description"]
     list_display = ["fy", "quarter", "description"]
     list_filter = ["fy", "quarter"]
-    actions = [export_as_csv_action(translations=["financialYear", "quarter", "description"], fields=["fy", "quarter", "description"])]
+    actions = [export_as_csv_action(translations=["financial_year", "quarter", "description"], fields=["fy", "quarter", "description"])]
 
 
 @register(MeasurementValue)
@@ -42,13 +42,13 @@ class MeasurementValueAdmin(ModelAdmin):
         parameter_name = "fy"
 
         def lookups(self, request, model_admin):
-            return [(fy.pk, fy.financialYear) for fy in FinancialYear.objects.all()]
+            return [(fy.pk, fy.financial_year) for fy in FinancialYear.objects.all()]
 
         def queryset(self, request, queryset):
             if self.value():
                 return queryset.filter(quarter__fy__pk=self.value())
 
-    search_fields = ["sfmMetric__metricID", "region", "quarter__fy__financialYear", "costCentre__costCentre", "comment"]
+    search_fields = ["sfmMetric__metricID", "region", "quarter__fy__financial_year", "costCentre__costCentre", "comment"]
     list_display = ["quarter", "region", "sfmMetric", "planned", "status"]
     list_filter = [FYFilter, "quarter", "region", "status", "sfmMetric"]
     readonly_fields = ("measurementType", "value")

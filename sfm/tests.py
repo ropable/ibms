@@ -44,8 +44,8 @@ class SfmViewsTest(IbmsTestCase):
         # For this, we need some dummy records.
         mixer.cycle(3).blend(CostCentre)
         mixer.cycle(3).blend(FinancialYear)
-        mixer.cycle(3).blend(SFMMetric, financialYear=mixer.SELECT)
-        mixer.cycle(3).blend(Quarter, financialYear=mixer.SELECT)
+        mixer.cycle(3).blend(SFMMetric, financial_year=mixer.SELECT)
+        mixer.cycle(3).blend(Quarter, financial_year=mixer.SELECT)
         mixer.cycle(3).blend(MeasurementType)
         mixer.cycle(3).blend(
             MeasurementValue,

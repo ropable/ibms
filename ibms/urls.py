@@ -44,17 +44,17 @@ urlpatterns = [
     ),
     path(
         "ajax/glpivdownload/cost-centre/",
-        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="costCentre"),
+        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="cost_centre"),
         name="ajax_ibmdata_costcentre",
     ),
     path(
         "ajax/glpivdownload/cost-centre/",
-        IbmsModelFieldJSON.as_view(model=GLPivDownload, fieldname="costCentre"),
+        IbmsModelFieldJSON.as_view(model=GLPivDownload, fieldname="cost_centre"),
         name="ajax_glpivdownload_costcentre",
     ),
     path(
         "ajax/glpivdownload/region-branch/",
-        IbmsModelFieldJSON.as_view(model=GLPivDownload, fieldname="regionBranch"),
+        IbmsModelFieldJSON.as_view(model=GLPivDownload, fieldname="region_branch"),
         name="ajax_glpivdownload_regionbranch",
     ),
     path(
@@ -74,12 +74,12 @@ urlpatterns = [
     ),
     path(
         "ajax/ibmdata/budget-area/",
-        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="budgetArea"),
+        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="budget_area"),
         name="ajax_ibmdata_budgetarea",
     ),
     path(
         "ajax/ibmdata/project-sponsor/",
-        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="projectSponsor"),
+        IbmsModelFieldJSON.as_view(model=IBMData, fieldname="project_sponsor"),
         name="ajax_ibmdata_projectsponsor",
     ),
     path(
@@ -89,7 +89,7 @@ urlpatterns = [
     ),
     path(
         "ajax/mappings",
-        ServicePriorityMappingJSON.as_view(model=ServicePriorityMapping, fieldname="wildlifeManagement, parksManagement, forestManagement"),
+        ServicePriorityMappingJSON.as_view(model=ServicePriorityMapping, fieldname="wildlife_management, parks_management, forest_management"),
         name="ajax_mappings",
     ),
 ]

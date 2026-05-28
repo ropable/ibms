@@ -38,7 +38,7 @@ def process_uploaded_csv(blob_name: str, fy: str, file_type: str, username: str)
 
     blob_service = BlobServiceClient.from_connection_string(connection_string)
     blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
-    fy = FinancialYear.objects.get(financialYear=fy)
+    fy = FinancialYear.objects.get(financial_year=fy)
 
     if file_type == "gl_pivot_download":
         data_type, record_count = ibms_import_from_csv(blob_client, fy, GLPivDownload)

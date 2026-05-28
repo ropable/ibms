@@ -130,91 +130,91 @@ def ibms_import_from_csv(
                 try:
                     download_period = datetime.strptime(row[0], "%d/%m/%Y")
                 except ValueError:
-                    raise IBMSValidationError(f"Unable to parse downloadPeriod value {row[0]} as a date")
+                    raise IBMSValidationError(f"Unable to parse download_period_str value {row[0]} as a date")
                 return_str = "GL Pivot Download"
                 _ = GLPivDownload.objects.create(
                     fy=fy,
                     download_period=download_period,
-                    downloadPeriod=row[0],
-                    costCentre=row[1],
+                    download_period_str=row[0],
+                    cost_centre=row[1],
                     account=row[2],
                     service=row[3],
                     activity=row[4],
                     resource=row[5],
                     project=row[6],
                     job=row[7],
-                    shortCode=row[8],
-                    shortCodeName=row[9],
-                    gLCode=row[10],
-                    ptdActual=row[11],
-                    ptdBudget=row[12],
-                    ytdActual=row[13],
-                    ytdBudget=row[14],
+                    short_code=row[8],
+                    short_code_name=row[9],
+                    gl_code=row[10],
+                    ptd_actual=row[11],
+                    ptd_budget=row[12],
+                    ytd_actual=row[13],
+                    ytd_budget=row[14],
                     fybudget=row[15],
-                    ytdVariance=row[16],
-                    ccName=row[17],
-                    serviceName=row[18],
-                    activityName=row[19],
-                    resourceName=row[20],
-                    projectName=row[21],
-                    jobName=row[22],
-                    codeID=row[23],
-                    resNameNo=row[24],
-                    actNameNo=row[25],
-                    projNameNo=row[26],
-                    regionBranch=row[27],
+                    ytd_variance=row[16],
+                    cc_name=row[17],
+                    service_name=row[18],
+                    activity_name=row[19],
+                    resource_name=row[20],
+                    project_name=row[21],
+                    job_name=row[22],
+                    code_id=row[23],
+                    res_name_no=row[24],
+                    act_name_no=row[25],
+                    proj_name_no=row[26],
+                    region_branch=row[27],
                     division=row[28],
-                    resourceCategory=row[29],
+                    resource_category=row[29],
                     wildfire=row[30],
-                    expenseRevenue=row[31],
-                    fireActivities=row[32],
-                    mPRACategory=row[33],
+                    expense_revenue=row[31],
+                    fire_activities=row[32],
+                    mpra_category=row[33],
                 )
         elif model == IBMData:
             for row in reader:
                 record_count += 1
                 return_str = "IBM Data"
                 with create_revision():
-                    if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0])).exists():
-                        ibmdata = IBMData.objects.get(fy=fy, ibmIdentifier=str(row[0]))
-                        ibmdata.costCentre = row[1]
+                    if IBMData.objects.filter(fy=fy, ibm_identifier=str(row[0])).exists():
+                        ibmdata = IBMData.objects.get(fy=fy, ibm_identifier=str(row[0]))
+                        ibmdata.cost_centre = row[1]
                         ibmdata.account = row[2]
                         ibmdata.service = row[3]
                         ibmdata.activity = row[4]
                         ibmdata.project = row[5]
                         ibmdata.job = row[6]
-                        ibmdata.budgetArea = row[7]
-                        ibmdata.projectSponsor = row[8]
-                        ibmdata.regionalSpecificInfo = row[9]
-                        ibmdata.servicePriorityID = row[10]
-                        ibmdata.annualWPInfo = row[11]
-                        ibmdata.priorityActionNo = row[12]
-                        ibmdata.priorityLevel = row[13]
-                        ibmdata.marineKPI = row[14]
-                        ibmdata.regionProject = row[15]
-                        ibmdata.regionDescription = row[16]
+                        ibmdata.budget_area = row[7]
+                        ibmdata.project_sponsor = row[8]
+                        ibmdata.regional_specific_info = row[9]
+                        ibmdata.service_priority_id = row[10]
+                        ibmdata.annual_wp_info = row[11]
+                        ibmdata.priority_action_no = row[12]
+                        ibmdata.priority_level = row[13]
+                        ibmdata.marine_kpi = row[14]
+                        ibmdata.region_project = row[15]
+                        ibmdata.region_description = row[16]
                         ibmdata.save()
                         set_comment(f"{ibmdata} amended via upload")
                     else:
                         data = {
                             "fy": fy,
-                            "ibmIdentifier": validate_char_field("ibmIdentifier", 50, row[0]),
-                            "costCentre": validate_char_field("costCentre", 4, row[1]),
+                            "ibm_identifier": validate_char_field("ibm_identifier", 50, row[0]),
+                            "cost_centre": validate_char_field("cost_centre", 4, row[1]),
                             "account": validate_integer_field("account", row[2]),
                             "service": validate_integer_field("service", row[3]),
                             "activity": validate_char_field("activity", 4, row[4]),
                             "project": validate_char_field("project", 6, row[5]),
                             "job": validate_char_field("job", 6, row[6]),
-                            "budgetArea": validate_char_field("budgetArea", 50, row[7]),
-                            "projectSponsor": validate_char_field("projectSponsor", 50, str(row[8])),
-                            "regionalSpecificInfo": row[9],
-                            "servicePriorityID": validate_char_field("servicePriorityID", 100, row[10]),
-                            "annualWPInfo": str(row[11]),
-                            "priorityActionNo": str(row[12]),
-                            "priorityLevel": str(row[13]),
-                            "marineKPI": str(row[14]),
-                            "regionProject": str(row[15]),
-                            "regionDescription": str(row[16]),
+                            "budget_area": validate_char_field("budget_area", 50, row[7]),
+                            "project_sponsor": validate_char_field("project_sponsor", 50, str(row[8])),
+                            "regional_specific_info": row[9],
+                            "service_priority_id": validate_char_field("service_priority_id", 100, row[10]),
+                            "annual_wp_info": str(row[11]),
+                            "priority_action_no": str(row[12]),
+                            "priority_level": str(row[13]),
+                            "marine_kpi": str(row[14]),
+                            "region_project": str(row[15]),
+                            "region_description": str(row[16]),
                         }
                         ibmdata = IBMData(**data)
                         ibmdata.save()
@@ -223,7 +223,7 @@ def ibms_import_from_csv(
                         if not ibmdata.service_priority:
                             ibmdata.save()
                 # Update any existing GLPivDownload objects that should now link to this object.
-                for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
+                for glpiv in GLPivDownload.objects.filter(fy=fy, code_id=ibmdata.ibm_identifier, ibmdata__isnull=True):
                     glpiv.save()
         elif model == CorporateStrategy:
             for row in reader:
@@ -231,11 +231,11 @@ def ibms_import_from_csv(
                 return_str = "IBMS Corporate Strategy"
                 data = {
                     "fy": fy,
-                    "corporateStrategyNo": validate_char_field("corporateStrategyNo", 10, row[0]),
+                    "corporate_strategy_no": validate_char_field("corporate_strategy_no", 10, row[0]),
                     "description1": str(row[1]),
                     "description2": str(row[2]),
                 }
-                query = {"fy": fy, "corporateStrategyNo": str(row[0])}
+                query = {"fy": fy, "corporate_strategy_no": str(row[0])}
                 _, _ = CorporateStrategy.objects.update_or_create(defaults=data, **query)
         elif model == NCStrategicPlan:
             for row in reader:
@@ -243,45 +243,45 @@ def ibms_import_from_csv(
                 return_str = "Nature Conservation"
                 data = {
                     "fy": fy,
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[0]),
-                    "directionNo": validate_char_field("directionNo", 20, row[1]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 20, row[0]),
+                    "direction_no": validate_char_field("direction_no", 20, row[1]),
                     "direction": str(row[2]),
-                    "aimNo": validate_char_field("directionNo", 20, row[3]),
+                    "aim_no": validate_char_field("direction_no", 20, row[3]),
                     "aim1": str(row[4]),
                     "aim2": str(row[5]),
-                    "actionNo": validate_char_field("directionNo", 20, row[6]),
+                    "action_no": validate_char_field("direction_no", 20, row[6]),
                     "action": str(row[7]),
                 }
-                query = {"fy": fy, "strategicPlanNo": str(row[0])}
+                query = {"fy": fy, "strategic_plan_no": str(row[0])}
                 _, _ = NCStrategicPlan.objects.update_or_create(defaults=data, **query)
         elif model == DepartmentProgram:
             for row in reader:
                 record_count += 1
                 data = {
                     "fy": fy,
-                    "ibmIdentifier": validate_char_field("ibmIdentifier", 100, row[0]),
+                    "ibm_identifier": validate_char_field("ibm_identifier", 100, row[0]),
                     "dept_program1": validate_char_field("DeptProgram1", 500, row[1]),
                     "dept_program2": validate_char_field("DeptProgram2", 500, row[2]),
                     "dept_program3": validate_char_field("DeptProgram3", 500, row[3]),
                 }
-                query = {"fy": fy, "ibmIdentifier": str(row[0])}
+                query = {"fy": fy, "ibm_identifier": str(row[0])}
                 department_program, _ = DepartmentProgram.objects.update_or_create(defaults=data, **query)
                 # Update any GLPivDownload objects that should be linked to this object.
-                for gl in GLPivDownload.objects.filter(fy=fy, codeID=department_program.ibmIdentifier, department_program__isnull=True):
+                for gl in GLPivDownload.objects.filter(fy=fy, code_id=department_program.ibm_identifier, department_program__isnull=True):
                     gl.save()  # Sets the FK link on save.
         elif model == GeneralServicePriority:
             for row in reader:
                 record_count += 1
                 data = {
                     "fy": fy,
-                    "categoryID": validate_char_field("categoryID", 30, row[0]),
-                    "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[1]),
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[2]),
-                    "corporateStrategyNo": row[3],
+                    "category_id": validate_char_field("category_id", 30, row[0]),
+                    "service_priority_no": validate_char_field("service_priority_no", 20, row[1]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 20, row[2]),
+                    "corporate_strategy_no": row[3],
                     "description": str(row[4]),
                     "description2": str(row[5]),
                 }
-                query = {"fy": fy, "servicePriorityNo": str(row[1])}
+                query = {"fy": fy, "service_priority_no": str(row[1])}
                 _, _ = GeneralServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == NCServicePriority:
             for row in reader:
@@ -289,20 +289,20 @@ def ibms_import_from_csv(
                 return_str = "Nature Conservation Service Priority"
                 data = {
                     "fy": fy,
-                    "categoryID": validate_char_field("categoryID", 30, row[0]),
-                    "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
-                    "corporateStrategyNo": validate_char_field("corporateStrategyNo", 100, row[3]),
-                    "assetNo": validate_char_field("AssetNo", 5, row[4]),
+                    "category_id": validate_char_field("category_id", 30, row[0]),
+                    "service_priority_no": validate_char_field("service_priority_no", 100, row[1]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 100, row[2]),
+                    "corporate_strategy_no": validate_char_field("corporate_strategy_no", 100, row[3]),
+                    "asset_no": validate_char_field("AssetNo", 5, row[4]),
                     "asset": str(row[5]),
-                    "targetNo": validate_char_field("Asset", 30, row[6]),
+                    "target_no": validate_char_field("Asset", 30, row[6]),
                     "target": str(row[7]),
-                    "actionNo": str(row[8]),
+                    "action_no": str(row[8]),
                     "action": str(row[9]),
-                    "mileNo": validate_char_field("MileNo", 30, row[10]),
+                    "mile_no": validate_char_field("MileNo", 30, row[10]),
                     "milestone": str(row[11]),
                 }
-                query = {"fy": fy, "servicePriorityNo": str(row[1])}
+                query = {"fy": fy, "service_priority_no": str(row[1])}
                 _, _ = NCServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == PVSServicePriority:
             for row in reader:
@@ -310,16 +310,16 @@ def ibms_import_from_csv(
                 return_str = "Parks & Visitor Services Service Priority"
                 data = {
                     "fy": fy,
-                    "categoryID": validate_char_field("categoryID", 30, row[0]),
-                    "servicePriorityNo": validate_char_field("servicePriorityNo", 100, row[1]),
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 100, row[2]),
-                    "corporateStrategyNo": row[3],
-                    "servicePriority1": str(row[4]),
+                    "category_id": validate_char_field("category_id", 30, row[0]),
+                    "service_priority_no": validate_char_field("service_priority_no", 100, row[1]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 100, row[2]),
+                    "corporate_strategy_no": row[3],
+                    "service_priority_1": str(row[4]),
                     "description": str(row[5]),
-                    "pvsExampleAnnWP": str(row[6]),
-                    "pvsExampleActNo": str(row[7]),
+                    "pvs_example_ann_wp": str(row[6]),
+                    "pvs_example_act_no": str(row[7]),
                 }
-                query = {"fy": fy, "servicePriorityNo": str(row[1])}
+                query = {"fy": fy, "service_priority_no": str(row[1])}
                 _, _ = PVSServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == SFMServicePriority:
             for row in reader:
@@ -327,15 +327,15 @@ def ibms_import_from_csv(
                 return_str = "Forest Management Service Priority"
                 data = {
                     "fy": fy,
-                    "categoryID": validate_char_field("categoryID", 30, row[0]),
-                    "regionBranch": validate_char_field("regionBranch", 20, row[1]),
-                    "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2]),
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 20, row[3]),
-                    "corporateStrategyNo": row[4],
+                    "category_id": validate_char_field("category_id", 30, row[0]),
+                    "region_branch": validate_char_field("region_branch", 20, row[1]),
+                    "service_priority_no": validate_char_field("service_priority_no", 20, row[2]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 20, row[3]),
+                    "corporate_strategy_no": row[4],
                     "description": str(row[5]),
                     "description2": str(row[6]),
                 }
-                query = {"fy": fy, "servicePriorityNo": validate_char_field("servicePriorityNo", 20, row[2])}
+                query = {"fy": fy, "service_priority_no": validate_char_field("service_priority_no", 20, row[2])}
                 _, _ = SFMServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == ERServicePriority:
             for row in reader:
@@ -343,14 +343,14 @@ def ibms_import_from_csv(
                 return_str = "Fire Services Service Priority"
                 data = {
                     "fy": fy,
-                    "categoryID": validate_char_field("categoryID", 30, row[0]),
-                    "servicePriorityNo": validate_char_field("servicePriorityNo", 10, row[1]),
-                    "strategicPlanNo": validate_char_field("strategicPlanNo", 10, row[2]),
-                    "corporateStrategyNo": row[3],
+                    "category_id": validate_char_field("category_id", 30, row[0]),
+                    "service_priority_no": validate_char_field("service_priority_no", 10, row[1]),
+                    "strategic_plan_no": validate_char_field("strategic_plan_no", 10, row[2]),
+                    "corporate_strategy_no": row[3],
                     "classification": str(row[4]),
                     "description": str(row[5]),
                 }
-                query = {"fy": fy, "servicePriorityNo": str(row[1])}
+                query = {"fy": fy, "service_priority_no": str(row[1])}
                 _, _ = ERServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == ServicePriorityMapping:
             for row in reader:
@@ -358,10 +358,10 @@ def ibms_import_from_csv(
                 return_str = "Service Priority Mapping"
                 data = {
                     "fy": fy,
-                    "costCentreNo": validate_char_field("costCentreNo", 4, row[0]),
-                    "wildlifeManagement": validate_char_field("wildlifeManagement", 100, row[1]),
-                    "parksManagement": validate_char_field("parksManagement", 100, row[2]),
-                    "forestManagement": validate_char_field("forestManagement", 100, row[3]),
+                    "cost_centre_no": validate_char_field("cost_centre_no", 4, row[0]),
+                    "wildlife_management": validate_char_field("wildlife_management", 100, row[1]),
+                    "parks_management": validate_char_field("parks_management", 100, row[2]),
+                    "forest_management": validate_char_field("forest_management", 100, row[3]),
                 }
                 _, _ = ServicePriorityMapping.objects.update_or_create(**data)
 
@@ -480,11 +480,11 @@ def validate_upload_file(in_file, file_type) -> Literal[True]:
                 "StratPlanNo",
                 "StratDirNo",
                 "StratDir",
-                "aimNo",
-                "aim1",
-                "aim2",
-                "actNo",
-                "action",
+                "AimNo",
+                "Aim1",
+                "Aim2",
+                "ActNo",
+                "Action",
             ],
         )
     elif file_type == "dept_program":

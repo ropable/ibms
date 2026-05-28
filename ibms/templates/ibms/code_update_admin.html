@@ -15,7 +15,7 @@
         $.ajax({
             type: "GET",
             url: "{% url 'ibms:ajax_glpivdownload_costcentre' %}",
-            data: {"financialYear": finYear},
+            data: {"financial_year": finYear},
             success: function(data) {
                 select = $("select#id_cost_centre")[0];
                 select.options.length = 0;
@@ -33,7 +33,7 @@
         $.ajax({
             type: "GET",
             url: "{% url 'ibms:ajax_mappings' %}",
-            data: {"financialYear": finYear, "costCentreNo": costCentreNo},
+            data: {"financial_year": finYear, "cost_centre_no": costCentreNo},
             success : function(data) {
                 checkMappedBoxes(data.choices);
             }

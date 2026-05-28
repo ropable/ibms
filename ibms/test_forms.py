@@ -26,7 +26,7 @@ class UploadFormTest(IbmsTestCase):
 
     def test_upload_form_file_required(self):
         """UploadForm should require file upload"""
-        fy = mixer.blend(FinancialYear, financialYear="2024/25")
+        fy = mixer.blend(FinancialYear, financial_year="2024/25")
         form = UploadForm(
             data={
                 "upload_file_type": "ibm_data",
@@ -38,7 +38,7 @@ class UploadFormTest(IbmsTestCase):
 
     def test_upload_form_csv_validation_rejects_json(self):
         """UploadForm should reject JSON files"""
-        fy = mixer.blend(FinancialYear, financialYear="2024/25")
+        fy = mixer.blend(FinancialYear, financial_year="2024/25")
         json_file = SimpleUploadedFile("test.json", b'{"test": "data"}', content_type="application/json")
 
         form = UploadForm(
@@ -66,7 +66,7 @@ class UploadFormTest(IbmsTestCase):
 
     def test_upload_form_file_type_required(self):
         """UploadForm should require file type selection"""
-        fy = mixer.blend(FinancialYear, financialYear="2024/25")
+        fy = mixer.blend(FinancialYear, financial_year="2024/25")
         csv_file = SimpleUploadedFile("test.csv", b"data", content_type="text/csv")
 
         form = UploadForm(
@@ -81,8 +81,8 @@ class UploadFormTest(IbmsTestCase):
 
     def test_upload_form_financial_year_queryset(self):
         """UploadForm should include all available financial years"""
-        fy1 = mixer.blend(FinancialYear, financialYear="2024/25")
-        fy2 = mixer.blend(FinancialYear, financialYear="2023/24")
+        fy1 = mixer.blend(FinancialYear, financial_year="2024/25")
+        fy2 = mixer.blend(FinancialYear, financial_year="2023/24")
 
         form = UploadForm()
         fy_queryset = form.fields["financial_year"].queryset
@@ -93,12 +93,12 @@ class UploadFormTest(IbmsTestCase):
 
     def test_upload_form_financial_year_ordered_descending(self):
         """UploadForm should order financial years in descending order"""
-        fy1 = mixer.blend(FinancialYear, financialYear="2022/23")
-        fy2 = mixer.blend(FinancialYear, financialYear="2024/25")
-        fy3 = mixer.blend(FinancialYear, financialYear="2023/24")
+        fy1 = mixer.blend(FinancialYear, financial_year="2022/23")
+        fy2 = mixer.blend(FinancialYear, financial_year="2024/25")
+        fy3 = mixer.blend(FinancialYear, financial_year="2023/24")
 
         form = UploadForm()
-        fy_values = list(form.fields["financial_year"].queryset.values_list("financialYear", flat=True))
+        fy_values = list(form.fields["financial_year"].queryset.values_list("financial_year", flat=True))
 
         # Should be in descending order
         self.assertEqual(fy_values[0], "2024/25")
@@ -117,8 +117,8 @@ class ClearGLPivotFormTest(IbmsTestCase):
 
     def test_clear_glpivot_form_financial_year_queryset_populated(self):
         """ClearGLPivotForm should include available financial years"""
-        fy1 = mixer.blend(FinancialYear, financialYear="2024/25")
-        fy2 = mixer.blend(FinancialYear, financialYear="2023/24")
+        fy1 = mixer.blend(FinancialYear, financial_year="2024/25")
+        fy2 = mixer.blend(FinancialYear, financial_year="2023/24")
 
         form = ClearGLPivotForm()
         fy_queryset = form.fields["financial_year"].queryset
@@ -129,7 +129,7 @@ class ClearGLPivotFormTest(IbmsTestCase):
 
     def test_clear_glpivot_form_valid_submission(self):
         """ClearGLPivotForm should be valid with financial year"""
-        fy = mixer.blend(FinancialYear, financialYear="2024/25")
+        fy = mixer.blend(FinancialYear, financial_year="2024/25")
 
         form = ClearGLPivotForm(
             data={
@@ -141,12 +141,12 @@ class ClearGLPivotFormTest(IbmsTestCase):
 
     def test_clear_glpivot_form_financial_year_ordered_descending(self):
         """ClearGLPivotForm should order financial years descending"""
-        fy1 = mixer.blend(FinancialYear, financialYear="2022/23")
-        fy2 = mixer.blend(FinancialYear, financialYear="2024/25")
-        fy3 = mixer.blend(FinancialYear, financialYear="2023/24")
+        fy1 = mixer.blend(FinancialYear, financial_year="2022/23")
+        fy2 = mixer.blend(FinancialYear, financial_year="2024/25")
+        fy3 = mixer.blend(FinancialYear, financial_year="2023/24")
 
         form = ClearGLPivotForm()
-        fy_values = list(form.fields["financial_year"].queryset.values_list("financialYear", flat=True))
+        fy_values = list(form.fields["financial_year"].queryset.values_list("financial_year", flat=True))
 
         # Should be in descending order
         self.assertEqual(fy_values[0], "2024/25")

@@ -100,7 +100,7 @@ class ClearGLPivotView(IbmsFormView):
         fy = form.cleaned_data["financial_year"]
         count = GLPivDownload.objects.filter(fy=fy).count()
         with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM ibms_glpivdownload WHERE fy_id = %s", [fy.financialYear])
+            cursor.execute("DELETE FROM ibms_glpivdownload WHERE fy_id = %s", [fy.financial_year])
 
         messages.success(self.request, f"Deleted {count} GL Pivot entries for {fy}")
 
@@ -187,9 +187,9 @@ class DownloadView(IbmsFormView):
         glpiv_qs = GLPivDownload.objects.filter(fy=d["financial_year"])
 
         if d.get("cost_centre", None):
-            glpiv_qs = glpiv_qs.filter(costCentre=d["cost_centre"])
+            glpiv_qs = glpiv_qs.filter(cost_centre=d["cost_centre"])
         elif d.get("region", None):
-            glpiv_qs = glpiv_qs.filter(regionBranch=d["region"])
+            glpiv_qs = glpiv_qs.filter(region_branch=d["region"])
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
@@ -215,9 +215,9 @@ class DownloadEnhancedView(DownloadView):
         d = form.cleaned_data
         glpiv_qs = GLPivDownload.objects.filter(fy=d["financial_year"])
         if d.get("cost_centre", None):
-            glpiv_qs = glpiv_qs.filter(costCentre=d["cost_centre"])
+            glpiv_qs = glpiv_qs.filter(cost_centre=d["cost_centre"])
         elif d.get("region", None):
-            glpiv_qs = glpiv_qs.filter(regionBranch=d["region"])
+            glpiv_qs = glpiv_qs.filter(region_branch=d["region"])
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
@@ -252,9 +252,9 @@ class DownloadDeptProgramView(DownloadView):
         glpiv_qs = GLPivDownload.objects.filter(fy=d["financial_year"])
 
         if d.get("cost_centre", None):
-            glpiv_qs = glpiv_qs.filter(costCentre=d["cost_centre"])
+            glpiv_qs = glpiv_qs.filter(cost_centre=d["cost_centre"])
         elif d.get("region", None):
-            glpiv_qs = glpiv_qs.filter(regionBranch=d["region"])
+            glpiv_qs = glpiv_qs.filter(region_branch=d["region"])
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
@@ -310,8 +310,8 @@ class CodeUpdateAdminView(IbmsFormView):
         # CC limits both the querysets.
         cc = self.request.POST.get("cost_centre")
         if cc:
-            gl = gl.filter(costCentre=cc)
-            ibm = ibm.filter(costCentre=cc)
+            gl = gl.filter(cost_centre=cc)
+            ibm = ibm.filter(cost_centre=cc)
 
         # Filter GLPivot to resource < 4000
         gl = gl.filter(resource__lt=4000)
@@ -340,16 +340,16 @@ class CodeUpdateAdminView(IbmsFormView):
                 gl = gl.filter(account__in=[1, 2, 42])
             gl = gl.exclude(activity="DJ0", service__in=[42, 43, 75])
 
-        # Filter by codeID: EXCLUDE objects with a codeID that matches any
-        # IBMData object's ibmIdentifier for the same FY.
-        code_ids = set(ibm.values_list("ibmIdentifier", flat=True))
-        gl = gl.exclude(codeID__in=code_ids).order_by("codeID")
-        gl_codeids = sorted(set(gl.values_list("codeID", flat=True)))
+        # Filter by code_id: EXCLUDE objects with a code_id that matches any
+        # IBMData object's ibm_identifier for the same FY.
+        code_ids = set(ibm.values_list("ibm_identifier", flat=True))
+        gl = gl.exclude(code_id__in=code_ids).order_by("code_id")
+        gl_codeids = sorted(set(gl.values_list("code_id", flat=True)))
 
         # Service priority checkboxes.
-        nc_sp = NCServicePriority.objects.filter(fy=fy, categoryID__in=form.cleaned_data["ncChoice"]).order_by("servicePriorityNo")
-        pvs_sp = PVSServicePriority.objects.filter(fy=fy, categoryID__in=form.cleaned_data["pvsChoice"]).order_by("servicePriorityNo")
-        fm_sp = SFMServicePriority.objects.filter(fy=fy, categoryID__in=form.cleaned_data["fmChoice"]).order_by("servicePriorityNo")
+        nc_sp = NCServicePriority.objects.filter(fy=fy, category_id__in=form.cleaned_data["ncChoice"]).order_by("service_priority_no")
+        pvs_sp = PVSServicePriority.objects.filter(fy=fy, category_id__in=form.cleaned_data["pvsChoice"]).order_by("service_priority_no")
+        fm_sp = SFMServicePriority.objects.filter(fy=fy, category_id__in=form.cleaned_data["fmChoice"]).order_by("service_priority_no")
 
         # Style & populate the workbook.
         fpath = os.path.join(settings.STATIC_ROOT, "excel", "ibms_codeupdate_base.xls")
@@ -402,10 +402,10 @@ class ServicePriorityMappingJSON(LoginRequiredMixin, JSONResponseMixin, BaseDeta
         except ValueError:
             return HttpResponseBadRequest(f"Invalid field name: {self.fieldname}")
         r = self.model.objects.all()
-        if request.GET.get("financialYear", None):
-            r = r.filter(fy=request.GET["financialYear"])
-        if request.GET.get("costCentreNo", None):
-            r = r.filter(costCentreNo=request.GET["costCentreNo"])
+        if request.GET.get("financial_year", None):
+            r = r.filter(fy=request.GET["financial_year"])
+        if request.GET.get("cost_centre_no", None):
+            r = r.filter(cost_centre_no=request.GET["cost_centre_no"])
         choices = []
         r = r.distinct()
         try:
@@ -440,24 +440,24 @@ class IbmsModelFieldJSON(LoginRequiredMixin, JSONResponseMixin, BaseDetailView):
             return HttpResponseBadRequest(f"Invalid field name: {self.fieldname}")
 
         qs = self.model.objects.all()
-        if request.GET.get("financialYear", None):
-            qs = qs.filter(fy__financialYear=request.GET["financialYear"])
-        if request.GET.get("costCentre", None):
-            qs = qs.filter(costCentre=request.GET["costCentre"])
+        if request.GET.get("financial_year", None):
+            qs = qs.filter(fy__financial_year=request.GET["financial_year"])
+        if request.GET.get("cost_centre", None):
+            qs = qs.filter(cost_centre=request.GET["cost_centre"])
         if request.GET.get("service", None):
             qs = qs.filter(service=request.GET["service"])
 
-        if request.GET.get("regionBranch", None):
-            if self.model == IBMData and request.GET.get("financialYear", None):
-                # As regionBranch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
+        if request.GET.get("region_branch", None):
+            if self.model == IBMData and request.GET.get("financial_year", None):
+                # As region_branch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
                 # then use those values to filter the IBMData queryset.
-                fy = FinancialYear.objects.get(financialYear=request.GET["financialYear"])
+                fy = FinancialYear.objects.get(financial_year=request.GET["financial_year"])
                 cost_centres = set(
-                    GLPivDownload.objects.filter(fy=fy, regionBranch=self.request.GET["regionBranch"]).values_list("costCentre", flat=True)
+                    GLPivDownload.objects.filter(fy=fy, region_branch=self.request.GET["region_branch"]).values_list("cost_centre", flat=True)
                 )
-                qs = qs.filter(costCentre__in=cost_centres)
+                qs = qs.filter(cost_centre__in=cost_centres)
             else:
-                qs = qs.filter(regionBranch=request.GET["regionBranch"])
+                qs = qs.filter(region_branch=request.GET["region_branch"])
 
         # If we're not after PKs, then we need to reduce the qs to distinct values.
         # Limit to 500 distinct results to prevent unbounded responses on large tables.
@@ -511,8 +511,8 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
 
         # Always provide a default FY.
         if "financial_year" not in self.request.GET:
-            fy = FinancialYear.objects.order_by("-financialYear").first()
-            kwargs["initial"]["financial_year"] = fy.financialYear
+            fy = FinancialYear.objects.order_by("-financial_year").first()
+            kwargs["initial"]["financial_year"] = fy.financial_year
 
         return kwargs
 
@@ -553,10 +553,10 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
 
         # Financial year (in operation, we don't allow end-users to change this and default to the current FY)
         if self.request.GET.get("financial_year"):
-            fy = FinancialYear.objects.get(financialYear=self.request.GET["financial_year"])
+            fy = FinancialYear.objects.get(financial_year=self.request.GET["financial_year"])
         else:
             # Filter by the newest financial year.
-            fy = FinancialYear.objects.order_by("-financialYear").first()
+            fy = FinancialYear.objects.order_by("-financial_year").first()
 
         qs = IBMData.objects.filter(fy=fy)
 
@@ -566,25 +566,25 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
 
         # Business rule: exclude activity == "DJ0".
         qs = qs.exclude(activity="DJ0")
-        # Business rule: exclude records with an empty budgetArea.
-        qs = qs.exclude(budgetArea="")
+        # Business rule: exclude records with an empty budget_area.
+        qs = qs.exclude(budget_area="")
 
         # Cost centre
         if self.request.GET.get("cost_centre", None):
             # Validate the cost_centre value that was passed in.
             cost_centre = self.request.GET["cost_centre"]
-            valid_cc_set = IBMData.objects.values_list("costCentre", flat=True).distinct()
+            valid_cc_set = IBMData.objects.values_list("cost_centre", flat=True).distinct()
             if cost_centre not in valid_cc_set:
                 raise ValueError("Invalid cost centre")
-            qs = qs.filter(costCentre=cost_centre)
+            qs = qs.filter(cost_centre=cost_centre)
 
         # Region/branch
         if self.request.GET.get("region", None):
-            # As regionBranch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
+            # As region_branch is a field on GLPivDownload, we obtain the set of CC values for the given FY,
             # then use those values to filter the IBMData queryset.
             region_branch = self.request.GET["region"]
-            cost_centres = GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True).distinct()
-            qs = qs.filter(costCentre__in=cost_centres)
+            cost_centres = GLPivDownload.objects.filter(fy=fy, region_branch=region_branch).values_list("cost_centre", flat=True).distinct()
+            qs = qs.filter(cost_centre__in=cost_centres)
 
         # Service
         if self.request.GET.get("service", None):
@@ -617,21 +617,21 @@ class DataAmendmentList(LoginRequiredMixin, FormMixin, ListView):
         if self.request.GET.get("budget_area", None):
             # Validate the budget_area value that was passed in.
             budget_area = self.request.GET["budget_area"]
-            valid_budget_set = IBMData.objects.values_list("budgetArea", flat=True).distinct()
+            valid_budget_set = IBMData.objects.values_list("budget_area", flat=True).distinct()
             if budget_area not in valid_budget_set:
                 raise ValueError("Invalid budget area")
-            qs = qs.filter(budgetArea=budget_area)
+            qs = qs.filter(budget_area=budget_area)
 
         # Project sponsor
         if self.request.GET.get("project_sponsor", None):
             # Validate the project_sponsor value that was passed in.
             project_sponsor = self.request.GET["project_sponsor"]
-            valid_sponsor_set = IBMData.objects.values_list("projectSponsor", flat=True).distinct()
+            valid_sponsor_set = IBMData.objects.values_list("project_sponsor", flat=True).distinct()
             if project_sponsor not in valid_sponsor_set:
                 raise ValueError("Invalid project sponsor")
-            qs = qs.filter(projectSponsor=project_sponsor)
+            qs = qs.filter(project_sponsor=project_sponsor)
 
-        return qs.order_by("ibmIdentifier").select_related("fy")
+        return qs.order_by("ibm_identifier").select_related("fy")
 
 
 class DataAmendmentUpdate(RevisionMixin, UpdateView):
@@ -649,8 +649,8 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
         obj = self.get_object()
         if self.request.user.is_superuser:
             context["superuser"] = True
-        context["page_title"] = f"{settings.SITE_ACRONYM} | Edit IBM data {obj.ibmIdentifier}"
-        context["title"] = f"EDIT IBM DATA {obj.ibmIdentifier}"
+        context["page_title"] = f"{settings.SITE_ACRONYM} | Edit IBM data {obj.ibm_identifier}"
+        context["title"] = f"EDIT IBM DATA {obj.ibm_identifier}"
         return context
 
     def get_form_kwargs(self):
@@ -676,10 +676,10 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
 
     def form_valid(self, form):
         obj = self.get_object()
-        messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
-        set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
+        messages.success(self.request, f"{obj.ibm_identifier} ({obj.fy}) was amended successfully")
+        set_comment(f"{obj.ibm_identifier} ({obj.fy}) amended in the update form")
         # Find any matching GLPivDownload records and set the FK link.
-        for glpiv in GLPivDownload.objects.filter(fy=obj.fy, codeID=obj.ibmIdentifier, ibmdata__isnull=True):
+        for glpiv in GLPivDownload.objects.filter(fy=obj.fy, code_id=obj.ibm_identifier, ibmdata__isnull=True):
             glpiv.save()
         return super().form_valid(form)
 
@@ -710,8 +710,8 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
 
         # Always provide a default FY.
         if "financial_year" not in self.request.GET:
-            fy = FinancialYear.objects.order_by("-financialYear").first()
-            kwargs["initial"]["financial_year"] = fy.financialYear
+            fy = FinancialYear.objects.order_by("-financial_year").first()
+            kwargs["initial"]["financial_year"] = fy.financial_year
 
         return kwargs
 
@@ -732,12 +732,12 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         # Cast the account and service fields as string and left-pad them with zeroes.
         new_ibmdata.account = str(new_ibmdata.account).zfill(2)
         new_ibmdata.service = str(new_ibmdata.service).zfill(2)
-        # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
-        new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
+        # Construct the ibm_identifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
+        new_ibmdata.ibm_identifier = f"{new_ibmdata.cost_centre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
 
         # Short-circuit: if a matching IBMData record exists, return to that object view instead.
-        if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
-            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
+        if IBMData.objects.filter(fy=new_ibmdata.fy, ibm_identifier=new_ibmdata.ibm_identifier).exists():
+            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibm_identifier=new_ibmdata.ibm_identifier)
             messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
             return redirect(existing_ibmdata.get_absolute_url())
 
@@ -745,7 +745,7 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
         # Find any matching GLPivDownload records and set the FK link.
-        for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier, ibmdata__isnull=True):
+        for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, code_id=new_ibmdata.ibm_identifier, ibmdata__isnull=True):
             glpiv.save()
 
         return super().form_valid(form)
@@ -785,7 +785,7 @@ class BlobUploadView(UploadView):
             return self.form_invalid(form)
 
         messages.success(self.request, f"File uploaded successfully ({blob_name}). Notification will be sent when processing is complete.")
-        process_uploaded_csv.enqueue(blob_name, fy.financialYear, file_type, self.request.user.username)
+        process_uploaded_csv.enqueue(blob_name, fy.financial_year, file_type, self.request.user.username)
         # Skip UploadView.form_valid (which processes the file locally) and go straight
         # to the redirect provided by FormView.form_valid.
         return super(UploadView, self).form_valid(form)

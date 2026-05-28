@@ -41,7 +41,7 @@ class FinancialYearFilterForm(HelperForm):
     """Base form class to be include a financial year filter select."""
 
     financial_year = forms.ModelChoiceField(
-        queryset=FinancialYear.objects.all().order_by("-financialYear"), empty_label=None, required=True
+        queryset=FinancialYear.objects.all().order_by("-financial_year"), empty_label=None, required=True
     )
 
 
@@ -114,10 +114,10 @@ class DownloadForm(FinancialYearFilterForm):
         super(DownloadForm, self).__init__(*args, **kwargs)
         self.request = request
         self.fields["cost_centre"] = forms.ChoiceField(
-            choices=get_generic_choices(GLPivDownload, "costCentre", allow_null=True), required=False
+            choices=get_generic_choices(GLPivDownload, "cost_centre", allow_null=True), required=False
         )
         self.fields["region"] = forms.ChoiceField(
-            choices=get_generic_choices(GLPivDownload, "regionBranch", allow_null=True),
+            choices=get_generic_choices(GLPivDownload, "region_branch", allow_null=True),
             required=False,
             label="Region/branch",
         )
@@ -168,10 +168,10 @@ class DataAmendmentForm(FinancialYearFilterForm):
         super(DataAmendmentForm, self).__init__(*args, **kwargs)
         self.request = request
         self.fields["cost_centre"] = forms.ChoiceField(
-            choices=get_generic_choices(GLPivDownload, "costCentre", allow_null=True), required=False
+            choices=get_generic_choices(GLPivDownload, "cost_centre", allow_null=True), required=False
         )
         self.fields["region"] = forms.ChoiceField(
-            choices=get_generic_choices(GLPivDownload, "regionBranch", allow_null=True),
+            choices=get_generic_choices(GLPivDownload, "region_branch", allow_null=True),
             required=False,
             label="Region/branch",
         )
@@ -179,28 +179,28 @@ class DataAmendmentForm(FinancialYearFilterForm):
             choices=get_generic_choices(GLPivDownload, "service", allow_null=True), required=False, label="Service"
         )
         self.fields["budget_area"] = forms.ChoiceField(
-            choices=get_generic_choices(IBMData, "budgetArea", allow_null=True), required=False, label="Budget Area"
+            choices=get_generic_choices(IBMData, "budget_area", allow_null=True), required=False, label="Budget Area"
         )
         self.fields["project_sponsor"] = forms.ChoiceField(
-            choices=get_generic_choices(IBMData, "projectSponsor", allow_null=True),
+            choices=get_generic_choices(IBMData, "project_sponsor", allow_null=True),
             required=False,
             label="Project Sponsor",
         )
         self.fields["ncChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(NCServicePriority, "categoryID"),
+            choices=get_generic_choices(NCServicePriority, "category_id"),
             required=False,
             label="Wildlife Management",
         )
         self.fields["pvsChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(PVSServicePriority, "categoryID"),
+            choices=get_generic_choices(PVSServicePriority, "category_id"),
             required=False,
             label="Parks Management",
         )
         self.fields["fmChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(SFMServicePriority, "categoryID"),
+            choices=get_generic_choices(SFMServicePriority, "category_id"),
             required=False,
             label="Forest Management",
         )
@@ -261,23 +261,23 @@ class CodeUpdateForm(FinancialYearFilterForm):
     def __init__(self, *args, **kwargs):
         super(CodeUpdateForm, self).__init__(*args, **kwargs)
         self.fields["cost_centre"] = forms.ChoiceField(
-            choices=get_generic_choices(GLPivDownload, "costCentre", allow_null=True), required=True
+            choices=get_generic_choices(GLPivDownload, "cost_centre", allow_null=True), required=True
         )
         self.fields["ncChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(NCServicePriority, "categoryID"),
+            choices=get_generic_choices(NCServicePriority, "category_id"),
             required=False,
             label="Wildlife Management",
         )
         self.fields["pvsChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(PVSServicePriority, "categoryID"),
+            choices=get_generic_choices(PVSServicePriority, "category_id"),
             required=False,
             label="Parks Management",
         )
         self.fields["fmChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(SFMServicePriority, "categoryID"),
+            choices=get_generic_choices(SFMServicePriority, "category_id"),
             required=False,
             label="Forest Management",
         )
@@ -324,19 +324,19 @@ class ManagerCodeUpdateForm(FinancialYearFilterForm):
         )
         self.fields["ncChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(NCServicePriority, "categoryID"),
+            choices=get_generic_choices(NCServicePriority, "category_id"),
             required=False,
             label="Wildlife Management",
         )
         self.fields["pvsChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(PVSServicePriority, "categoryID"),
+            choices=get_generic_choices(PVSServicePriority, "category_id"),
             required=False,
             label="Parks Management",
         )
         self.fields["fmChoice"] = forms.MultipleChoiceField(
             widget=forms.CheckboxSelectMultiple,
-            choices=get_generic_choices(SFMServicePriority, "categoryID"),
+            choices=get_generic_choices(SFMServicePriority, "category_id"),
             required=False,
             label="Forest Management",
         )
@@ -355,7 +355,7 @@ class ManagerCodeUpdateForm(FinancialYearFilterForm):
 
 class IbmDataFilterForm(forms.Form):
     financial_year = forms.ModelChoiceField(
-        queryset=FinancialYear.objects.all().order_by("-financialYear"), empty_label=None, required=True
+        queryset=FinancialYear.objects.all().order_by("-financial_year"), empty_label=None, required=True
     )
     cost_centre = forms.ChoiceField(choices=[("", "--------")], required=False)
     region = forms.ChoiceField(choices=[("", "--------")], required=False, label="Region/branch")
@@ -368,39 +368,39 @@ class IbmDataFilterForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set field options for CC and Region/branch.
-        fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
-        cost_centres = IBMData.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        fy = FinancialYear.objects.get(financial_year=kwargs["initial"]["financial_year"])
+        cost_centres = IBMData.objects.filter(fy=fy, cost_centre__isnull=False).values_list("cost_centre", flat=True).distinct()
         self.fields["cost_centre"].choices += sorted([(i, i) for i in cost_centres])
-        regions = GLPivDownload.objects.filter(fy=fy, regionBranch__isnull=False).values_list("regionBranch", flat=True).distinct()
+        regions = GLPivDownload.objects.filter(fy=fy, region_branch__isnull=False).values_list("region_branch", flat=True).distinct()
         self.fields["region"].choices += sorted([(i, i) for i in regions])
 
         if "cost_centre" in kwargs["initial"] and kwargs["initial"]["cost_centre"]:
             budget_areas = (
-                IBMData.objects.filter(fy=fy, costCentre=kwargs["initial"]["cost_centre"], budgetArea__isnull=False)
-                .values_list("budgetArea", flat=True)
+                IBMData.objects.filter(fy=fy, cost_centre=kwargs["initial"]["cost_centre"], budget_area__isnull=False)
+                .values_list("budget_area", flat=True)
                 .distinct()
             )
             self.fields["budget_area"].choices += sorted([(i, i) for i in budget_areas if i])
             project_sponsors = (
-                IBMData.objects.filter(fy=fy, costCentre=kwargs["initial"]["cost_centre"], projectSponsor__isnull=False)
-                .values_list("projectSponsor", flat=True)
+                IBMData.objects.filter(fy=fy, cost_centre=kwargs["initial"]["cost_centre"], project_sponsor__isnull=False)
+                .values_list("project_sponsor", flat=True)
                 .distinct()
             )
             self.fields["project_sponsor"].choices += sorted([(i, i) for i in project_sponsors if i])
             services = (
-                IBMData.objects.filter(fy=fy, costCentre=kwargs["initial"]["cost_centre"], service__isnull=False)
+                IBMData.objects.filter(fy=fy, cost_centre=kwargs["initial"]["cost_centre"], service__isnull=False)
                 .values_list("service", flat=True)
                 .distinct()
             )
             self.fields["service"].choices += sorted([(i, i) for i in services if i])
             projects = (
-                IBMData.objects.filter(fy=fy, costCentre=kwargs["initial"]["cost_centre"], project__isnull=False)
+                IBMData.objects.filter(fy=fy, cost_centre=kwargs["initial"]["cost_centre"], project__isnull=False)
                 .values_list("project", flat=True)
                 .distinct()
             )
             self.fields["project"].choices += sorted([(i, i) for i in projects if i])
             jobs = (
-                IBMData.objects.filter(fy=fy, costCentre=kwargs["initial"]["cost_centre"], job__isnull=False)
+                IBMData.objects.filter(fy=fy, cost_centre=kwargs["initial"]["cost_centre"], job__isnull=False)
                 .values_list("job", flat=True)
                 .distinct()
             )
@@ -408,33 +408,33 @@ class IbmDataFilterForm(forms.Form):
 
         if "region" in kwargs["initial"] and kwargs["initial"]["region"]:
             region_branch = kwargs["initial"]["region"]
-            cost_centres = set(GLPivDownload.objects.filter(fy=fy, regionBranch=region_branch).values_list("costCentre", flat=True))
+            cost_centres = set(GLPivDownload.objects.filter(fy=fy, region_branch=region_branch).values_list("cost_centre", flat=True))
 
             budget_areas = (
-                IBMData.objects.filter(fy=fy, costCentre__in=cost_centres, budgetArea__isnull=False)
-                .values_list("budgetArea", flat=True)
+                IBMData.objects.filter(fy=fy, cost_centre__in=cost_centres, budget_area__isnull=False)
+                .values_list("budget_area", flat=True)
                 .distinct()
             )
             self.fields["budget_area"].choices += sorted([(i, i) for i in budget_areas if i])
             project_sponsors = (
-                IBMData.objects.filter(fy=fy, costCentre__in=cost_centres, projectSponsor__isnull=False)
-                .values_list("projectSponsor", flat=True)
+                IBMData.objects.filter(fy=fy, cost_centre__in=cost_centres, project_sponsor__isnull=False)
+                .values_list("project_sponsor", flat=True)
                 .distinct()
             )
             self.fields["project_sponsor"].choices += sorted([(i, i) for i in project_sponsors if i])
             services = (
-                IBMData.objects.filter(fy=fy, costCentre__in=cost_centres, service__isnull=False)
+                IBMData.objects.filter(fy=fy, cost_centre__in=cost_centres, service__isnull=False)
                 .values_list("service", flat=True)
                 .distinct()
             )
             self.fields["service"].choices += sorted([(i, i) for i in services if i])
             projects = (
-                IBMData.objects.filter(fy=fy, costCentre__in=cost_centres, project__isnull=False)
+                IBMData.objects.filter(fy=fy, cost_centre__in=cost_centres, project__isnull=False)
                 .values_list("project", flat=True)
                 .distinct()
             )
             self.fields["project"].choices += sorted([(i, i) for i in projects if i])
-            jobs = IBMData.objects.filter(fy=fy, costCentre__in=cost_centres, job__isnull=False).values_list("job", flat=True).distinct()
+            jobs = IBMData.objects.filter(fy=fy, cost_centre__in=cost_centres, job__isnull=False).values_list("job", flat=True).distinct()
             self.fields["job"].choices += sorted([(i, i) for i in jobs if i])
 
         # crispy_forms layout
@@ -488,32 +488,32 @@ class ListTextWidget(forms.TextInput):
 class IbmDataForm(forms.ModelForm):
     """Edit form in use for the Data Amendment view."""
 
-    budgetArea = forms.CharField(
+    budget_area = forms.CharField(
         label="Budget area",
         required=True,
         help_text="Free text. Delete existing value and click to display list.",
     )
-    projectSponsor = forms.CharField(
+    project_sponsor = forms.CharField(
         label="Project sponsor",
         required=False,
         help_text="Free text. Delete existing value and click to display list.",
     )
-    servicePriorityID = forms.ChoiceField(
+    service_priority_id = forms.ChoiceField(
         choices=[("", "--------")],
         label="Service priority ID",
         required=False,
     )
-    marineKPI = forms.CharField(
+    marine_kpi = forms.CharField(
         label="Marine KPI",
         required=False,
         help_text="Mandatory for Marine Parks. Free text. Delete existing value and click to display list.",
     )
-    regionProject = forms.CharField(
+    region_project = forms.CharField(
         label="Region project",
         required=False,
         help_text="Mandatory for PfoP. Free text. Delete existing value and click to display list.",
     )
-    regionDescription = forms.CharField(
+    region_description = forms.CharField(
         label="Region description",
         required=False,
         help_text="Mandatory for PfoP. Free text. Delete existing value and click to display list.",
@@ -528,78 +528,78 @@ class IbmDataForm(forms.ModelForm):
 
         # CharFields using ListTextWidget
         budget_areas = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, budgetArea__isnull=False)
-            .exclude(budgetArea="")
-            .values_list("budgetArea", flat=True)
+            IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, budget_area__isnull=False)
+            .exclude(budget_area="")
+            .values_list("budget_area", flat=True)
             .distinct()
         )
         budget_areas = sorted(list(budget_areas))
-        self.fields["budgetArea"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
+        self.fields["budget_area"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
 
         project_sponsors = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, projectSponsor__isnull=False)
-            .exclude(projectSponsor="")
-            .values_list("projectSponsor", flat=True)
+            IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, project_sponsor__isnull=False)
+            .exclude(project_sponsor="")
+            .values_list("project_sponsor", flat=True)
             .distinct()
         )
         project_sponsors = sorted(list(project_sponsors))
-        self.fields["projectSponsor"].widget = ListTextWidget(name="project_sponsors", data_list=project_sponsors)
+        self.fields["project_sponsor"].widget = ListTextWidget(name="project_sponsors", data_list=project_sponsors)
 
         # Service priority ID value options are sourced from a different model, depending on the instances service value.
         if instance.service == 12:
             service_priority_ids = (
-                GeneralServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+                GeneralServicePriority.objects.filter(fy=instance.fy).values_list("service_priority_no", flat=True).distinct()
             )
         elif instance.service == 24:
-            service_priority_ids = NCServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            service_priority_ids = NCServicePriority.objects.filter(fy=instance.fy).values_list("service_priority_no", flat=True).distinct()
         elif instance.service == 32:
-            service_priority_ids = PVSServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            service_priority_ids = PVSServicePriority.objects.filter(fy=instance.fy).values_list("service_priority_no", flat=True).distinct()
         elif instance.service in [41, 42, 43]:
-            service_priority_ids = SFMServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            service_priority_ids = SFMServicePriority.objects.filter(fy=instance.fy).values_list("service_priority_no", flat=True).distinct()
         elif instance.service in [72, 75]:
-            service_priority_ids = ERServicePriority.objects.filter(fy=instance.fy).values_list("servicePriorityNo", flat=True).distinct()
+            service_priority_ids = ERServicePriority.objects.filter(fy=instance.fy).values_list("service_priority_no", flat=True).distinct()
         else:
             service_priority_ids = (
-                IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, servicePriorityID__isnull=False)
-                .values_list("servicePriorityID", flat=True)
+                IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, service_priority_id__isnull=False)
+                .values_list("service_priority_id", flat=True)
                 .distinct()
             )
-        self.fields["servicePriorityID"].choices += sorted([(i, i) for i in service_priority_ids if i])
+        self.fields["service_priority_id"].choices += sorted([(i, i) for i in service_priority_ids if i])
 
         marine_kpis = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, marineKPI__isnull=False)
-            .exclude(marineKPI="")
-            .values_list("marineKPI", flat=True)
+            IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, marine_kpi__isnull=False)
+            .exclude(marine_kpi="")
+            .values_list("marine_kpi", flat=True)
             .distinct()
         )
         marine_kpis = sorted(list(marine_kpis))
-        self.fields["marineKPI"].widget = ListTextWidget(name="marine_kpi", data_list=marine_kpis)
+        self.fields["marine_kpi"].widget = ListTextWidget(name="marine_kpi", data_list=marine_kpis)
 
         region_projects = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, regionProject__isnull=False)
-            .exclude(regionProject="")
-            .values_list("regionProject", flat=True)
+            IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, region_project__isnull=False)
+            .exclude(region_project="")
+            .values_list("region_project", flat=True)
             .distinct()
         )
         region_projects = sorted(list(region_projects))
-        self.fields["regionProject"].widget = ListTextWidget(name="region_project", data_list=region_projects)
+        self.fields["region_project"].widget = ListTextWidget(name="region_project", data_list=region_projects)
 
         region_descriptions = (
-            IBMData.objects.filter(fy=instance.fy, costCentre=instance.costCentre, regionDescription__isnull=False)
-            .exclude(regionDescription="")
-            .values_list("regionDescription", flat=True)
+            IBMData.objects.filter(fy=instance.fy, cost_centre=instance.cost_centre, region_description__isnull=False)
+            .exclude(region_description="")
+            .values_list("region_description", flat=True)
             .distinct()
         )
         region_descriptions = sorted(list(region_descriptions))
-        self.fields["regionDescription"].widget = ListTextWidget(name="region_description", data_list=region_descriptions)
+        self.fields["region_description"].widget = ListTextWidget(name="region_description", data_list=region_descriptions)
 
-        self.fields["annualWPInfo"].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
+        self.fields["annual_wp_info"].widget = forms.Textarea(attrs={"cols": "40", "rows": "4"})
 
         # Readonly fields
         for field in [
-            "ibmIdentifier",
+            "ibm_identifier",
             "fy",
-            "costCentre",
+            "cost_centre",
             "account",
             "service",
             "activity",
@@ -610,25 +610,25 @@ class IbmDataForm(forms.ModelForm):
             self.fields[field].disabled = True
             self.fields[field].widget = forms.TextInput(attrs={"readonly": "readonly"})
 
-        # Business rule: for accounts 1, 2 and 42, the servicePriorityID field is compulsory.
+        # Business rule: for accounts 1, 2 and 42, the service_priority_id field is compulsory.
         if instance.account in [1, 2, 42]:
-            self.fields["servicePriorityID"].required = True
+            self.fields["service_priority_id"].required = True
 
         # Non-essential Textarea fields.
         for field in [
-            "regionalSpecificInfo",
-            "annualWPInfo",
-            "priorityActionNo",
-            "priorityLevel",
+            "regional_specific_info",
+            "annual_wp_info",
+            "priority_action_no",
+            "priority_level",
         ]:
             self.fields[field].required = False
             self.fields[field].help_text = "Free text."
 
         # Use smaller textarea widgets.
         for field in [
-            "regionalSpecificInfo",
-            "priorityActionNo",
-            "priorityLevel",
+            "regional_specific_info",
+            "priority_action_no",
+            "priority_level",
         ]:
             self.fields[field].widget = forms.Textarea(attrs={"cols": "40", "rows": "1"})
 
@@ -640,48 +640,48 @@ class IbmDataForm(forms.ModelForm):
         self.helper.help_text_inline = True
         self.helper.attrs = {"novalidate": ""}
         self.helper.layout = Layout(
-            "ibmIdentifier",
+            "ibm_identifier",
             "fy",
-            "budgetArea",
-            "projectSponsor",
-            "regionalSpecificInfo",
-            "servicePriorityID",
-            "annualWPInfo",
-            "costCentre",
+            "budget_area",
+            "project_sponsor",
+            "regional_specific_info",
+            "service_priority_id",
+            "annual_wp_info",
+            "cost_centre",
             "account",
             "service",
             "activity",
             "project",
             "job",
-            "priorityActionNo",
-            "priorityLevel",
-            "marineKPI",
-            "regionProject",
-            "regionDescription",
+            "priority_action_no",
+            "priority_level",
+            "marine_kpi",
+            "region_project",
+            "region_description",
             Div(self.save_button, self.cancel_button, css_class="col-sm-offset-4 col-md-offset-3 col-lg-offset-2"),
         )
 
     class Meta:
         model = IBMData
         fields = [
-            "ibmIdentifier",
+            "ibm_identifier",
             "fy",
-            "budgetArea",
-            "projectSponsor",
-            "regionalSpecificInfo",
-            "servicePriorityID",
-            "annualWPInfo",
-            "costCentre",
+            "budget_area",
+            "project_sponsor",
+            "regional_specific_info",
+            "service_priority_id",
+            "annual_wp_info",
+            "cost_centre",
             "account",
             "service",
             "activity",
             "project",
             "job",
-            "priorityActionNo",
-            "priorityLevel",
-            "marineKPI",
-            "regionProject",
-            "regionDescription",
+            "priority_action_no",
+            "priority_level",
+            "marine_kpi",
+            "region_project",
+            "region_description",
         ]
         exclude = ["id"]
 
@@ -696,7 +696,7 @@ class CodeUpdateCreateForm(forms.ModelForm):
         disabled=True,
         label="Financial year",
     )
-    costCentre = forms.ChoiceField(choices=[("", "--------")], required=True, label="Cost centre")
+    cost_centre = forms.ChoiceField(choices=[("", "--------")], required=True, label="Cost centre")
     service = forms.ChoiceField(
         choices=[
             ("", "--------"),
@@ -717,16 +717,16 @@ class CodeUpdateCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Take the existing model form fields and apply the required restrictions and validation rules.
-        fy = FinancialYear.objects.get(financialYear=kwargs["initial"]["financial_year"])
-        cost_centres = GLPivDownload.objects.filter(fy=fy, costCentre__isnull=False).values_list("costCentre", flat=True).distinct()
+        fy = FinancialYear.objects.get(financial_year=kwargs["initial"]["financial_year"])
+        cost_centres = GLPivDownload.objects.filter(fy=fy, cost_centre__isnull=False).values_list("cost_centre", flat=True).distinct()
         budget_areas = (
-            IBMData.objects.filter(fy=fy, budgetArea__isnull=False).exclude(budgetArea="").values_list("budgetArea", flat=True).distinct()
+            IBMData.objects.filter(fy=fy, budget_area__isnull=False).exclude(budget_area="").values_list("budget_area", flat=True).distinct()
         )
         budget_areas = sorted(list(budget_areas))
 
-        self.fields["fy"].queryset = FinancialYear.objects.filter(financialYear=kwargs["initial"]["financial_year"])
+        self.fields["fy"].queryset = FinancialYear.objects.filter(financial_year=kwargs["initial"]["financial_year"])
         self.fields["fy"].initial = fy
-        self.fields["costCentre"].choices += sorted([(i, i) for i in cost_centres])
+        self.fields["cost_centre"].choices += sorted([(i, i) for i in cost_centres])
         self.fields["account"].required = True
         self.fields["account"].validators = [
             MaxValueValidator(limit_value=99, message="Account value maximum is 99."),
@@ -762,8 +762,8 @@ class CodeUpdateCreateForm(forms.ModelForm):
         self.fields["job"].widget.attrs.update({"pattern": "[A-za-z0-9]{3}"})
 
         # CharFields using ListTextWidget
-        self.fields["budgetArea"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
-        self.fields["budgetArea"].help_text = "Free text. Click to display list of existing values."
+        self.fields["budget_area"].widget = ListTextWidget(name="budget_areas", data_list=budget_areas)
+        self.fields["budget_area"].help_text = "Free text. Click to display list of existing values."
 
         # crispy_forms layout
         self.helper = FormHelper()
@@ -773,13 +773,13 @@ class CodeUpdateCreateForm(forms.ModelForm):
         self.helper.help_text_inline = True
         self.helper.layout = Layout(
             "fy",
-            "costCentre",
+            "cost_centre",
             "account",
             "service",
             "activity",
             "project",
             "job",
-            "budgetArea",
+            "budget_area",
             Div(self.save_button, self.cancel_button, css_class="col-sm-offset-4 col-md-offset-3 col-lg-offset-2"),
         )
 
@@ -787,13 +787,13 @@ class CodeUpdateCreateForm(forms.ModelForm):
         model = IBMData
         fields = [
             "fy",
-            "costCentre",
+            "cost_centre",
             "account",
             "service",
             "activity",
             "project",
             "job",
-            "budgetArea",
+            "budget_area",
         ]
         exclude = ["id"]
 

@@ -62,7 +62,7 @@ class Quarter(models.Model):
         ordering = ("fy", "quarter")
 
     def __str__(self):
-        return f"{self.fy.financialYear} {self.description}"
+        return f"{self.fy.financial_year} {self.description}"
 
 
 class MeasurementValue(models.Model):

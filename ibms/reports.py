@@ -25,16 +25,16 @@ def service_priority_report(workbook, gl, ibm, nc_sp, pvs_sp, fm_sp):
     code_id = ""
     for _, data in enumerate(gl, current_row):
         # Only insert GLPivDownload objects with a matching IBMData object.
-        if ibm.filter(ibmIdentifier=data.codeID):
+        if ibm.filter(ibm_identifier=data.code_id):
             # We have to aggregate all the GLPivotDownload objects with
-            # matching codeID values, and insert one row with total
-            # ytdActual and fyBudget values.
-            if code_id != data.codeID:  # Reached the next codeID value.
-                code_id = data.codeID
-                i = ibm.get(ibmIdentifier=data.codeID)
+            # matching code_id values, and insert one row with total
+            # ytd_actual and fyBudget values.
+            if code_id != data.code_id:  # Reached the next code_id value.
+                code_id = data.code_id
+                i = ibm.get(ibm_identifier=data.code_id)
                 current_row += 1  # Advance one row.
-                sheet.write(current_row, 0, data.codeID)
-                sheet.write(current_row, 1, int(data.costCentre), pad3)
+                sheet.write(current_row, 0, data.code_id)
+                sheet.write(current_row, 1, int(data.cost_centre), pad3)
                 sheet.write(current_row, 2, data.account, pad2)
                 sheet.write(current_row, 3, data.service, pad2)
                 sheet.write(current_row, 4, data.activity)
@@ -46,18 +46,18 @@ def service_priority_report(workbook, gl, ibm, nc_sp, pvs_sp, fm_sp):
                     sheet.write(current_row, 6, int(data.job), pad3)
                 except ValueError:
                     sheet.write(current_row, 6, data.job, pad3)
-                sheet.write(current_row, 7, data.jobName)
-                sheet.write(current_row, 8, data.activityName)
-                sheet.write(current_row, 9, data.projNameNo)
-                sheet.write(current_row, 10, i.budgetArea)
-                sheet.write(current_row, 11, i.projectSponsor)
-                sheet.write(current_row, 12, i.regionalSpecificInfo)
-                sheet.write(current_row, 13, i.servicePriorityID)
-                sheet.write(current_row, 14, i.annualWPInfo)
-                sheet.write(current_row, 15, data.mPRACategory)
-                ytd = gl.filter(codeID=code_id).aggregate(Sum("ytdActual"))
-                fy = gl.filter(codeID=code_id).aggregate(Sum("fybudget"))
-                sheet.write(current_row, 16, ytd["ytdActual__sum"])
+                sheet.write(current_row, 7, data.job_name)
+                sheet.write(current_row, 8, data.activity_name)
+                sheet.write(current_row, 9, data.proj_name_no)
+                sheet.write(current_row, 10, i.budget_area)
+                sheet.write(current_row, 11, i.project_sponsor)
+                sheet.write(current_row, 12, i.regional_specific_info)
+                sheet.write(current_row, 13, i.service_priority_id)
+                sheet.write(current_row, 14, i.annual_wp_info)
+                sheet.write(current_row, 15, data.mpra_category)
+                ytd = gl.filter(code_id=code_id).aggregate(Sum("ytd_actual"))
+                fy = gl.filter(code_id=code_id).aggregate(Sum("fybudget"))
+                sheet.write(current_row, 16, ytd["ytd_actual__sum"])
                 sheet.write(current_row, 17, fy["fybudget__sum"])
 
     # Insert the footer row formulae and '#END OF INPUT'
@@ -88,16 +88,16 @@ def data_amend_report(workbook, gl, ibm, nc_sp, pvs_sp, fm_sp, ibm_filtered):
     code_id = ""
     for _, data in enumerate(gl, current_row):
         # Only insert GLPivDownload objects with a matching IBMData object.
-        if ibm.filter(ibmIdentifier=data.codeID).exists():
+        if ibm.filter(ibm_identifier=data.code_id).exists():
             # We have to aggregate all the GLPivotDownload objects with
-            # matching codeID values, and insert one row with total
-            # ytdActual and fyBudget values.
-            if code_id != data.codeID:  # Reached the next codeID value.
+            # matching code_id values, and insert one row with total
+            # ytd_actual and fyBudget values.
+            if code_id != data.code_id:  # Reached the next code_id value.
                 current_row += 1  # Advance one row.
-                code_id = data.codeID
-                i = ibm.get(ibmIdentifier=data.codeID)
-                sheet.write(current_row, 0, data.codeID)
-                sheet.write(current_row, 1, int(data.costCentre), pad3)
+                code_id = data.code_id
+                i = ibm.get(ibm_identifier=data.code_id)
+                sheet.write(current_row, 0, data.code_id)
+                sheet.write(current_row, 1, int(data.cost_centre), pad3)
                 sheet.write(current_row, 2, data.account, pad2)
                 sheet.write(current_row, 3, data.service, pad2)
                 sheet.write(current_row, 4, data.activity, pad3)
@@ -109,18 +109,18 @@ def data_amend_report(workbook, gl, ibm, nc_sp, pvs_sp, fm_sp, ibm_filtered):
                     sheet.write(current_row, 6, int(data.job), pad3)
                 except ValueError:
                     sheet.write(current_row, 6, data.job, pad3)
-                sheet.write(current_row, 7, data.jobName)
-                sheet.write(current_row, 8, data.activityName)
-                sheet.write(current_row, 9, data.projNameNo)
-                sheet.write(current_row, 10, i.budgetArea)
-                sheet.write(current_row, 11, i.projectSponsor)
-                sheet.write(current_row, 14, i.regionalSpecificInfo)
-                sheet.write(current_row, 15, i.servicePriorityID)
-                sheet.write(current_row, 18, i.annualWPInfo)
-                sheet.write(current_row, 19, data.mPRACategory)
-                ytd = gl.filter(codeID=code_id).aggregate(Sum("ytdActual"))
-                fy = gl.filter(codeID=code_id).aggregate(Sum("fybudget"))
-                sheet.write(current_row, 20, ytd["ytdActual__sum"])
+                sheet.write(current_row, 7, data.job_name)
+                sheet.write(current_row, 8, data.activity_name)
+                sheet.write(current_row, 9, data.proj_name_no)
+                sheet.write(current_row, 10, i.budget_area)
+                sheet.write(current_row, 11, i.project_sponsor)
+                sheet.write(current_row, 14, i.regional_specific_info)
+                sheet.write(current_row, 15, i.service_priority_id)
+                sheet.write(current_row, 18, i.annual_wp_info)
+                sheet.write(current_row, 19, data.mpra_category)
+                ytd = gl.filter(code_id=code_id).aggregate(Sum("ytd_actual"))
+                fy = gl.filter(code_id=code_id).aggregate(Sum("fybudget"))
+                sheet.write(current_row, 20, ytd["ytd_actual__sum"])
                 sheet.write(current_row, 21, fy["fybudget__sum"])
 
     # Insert the footer row formulae and '#END OF INPUT'
@@ -133,7 +133,7 @@ def data_amend_report(workbook, gl, ibm, nc_sp, pvs_sp, fm_sp, ibm_filtered):
     write_service_priorities(sheet, nc_sp, pvs_sp, fm_sp)
 
     # Sheet 3: Budget area & project sponsor lookup data.
-    # This is a list of unique budgetArea and projectSponsor values, written in
+    # This is a list of unique budget_area and project_sponsor values, written in
     # as reference data for macros.
     sheet = workbook.get_sheet(2)
     write_budget_areas(sheet, ibm_filtered)
@@ -183,12 +183,12 @@ def code_update_report(workbook_ro, workbook, gl, gl_codeids, nc_sp, pvs_sp, fm_
 
     for _, code_id in enumerate(gl_codeids, start=1):
         # For each of the GL code IDs, take a subset of the query and insert values as required.
-        gl_pivs = gl.filter(codeID=code_id)
+        gl_pivs = gl.filter(code_id=code_id)
         g = gl_pivs.first()  # Use the first GL code to write common values.
 
         # Fill the non-resource columns.
-        sheet.write(row, 0, g.codeID)
-        sheet.write(row, 1, int(g.costCentre), pad3)
+        sheet.write(row, 0, g.code_id)
+        sheet.write(row, 1, int(g.cost_centre), pad3)
         sheet.write(row, 2, g.account, pad2)
         sheet.write(row, 3, g.service, pad2)
         sheet.write(row, 4, g.activity, pad3)
@@ -200,22 +200,22 @@ def code_update_report(workbook_ro, workbook, gl, gl_codeids, nc_sp, pvs_sp, fm_
             sheet.write(row, 6, int(g.job), pad3)
         except ValueError:
             sheet.write(row, 6, g.job, pad3)
-        sheet.write(row, 7, g.jobName)
-        sheet.write(row, 8, g.activityName)
-        sheet.write(row, 9, g.projNameNo)
-        sheet.write(row, 19, g.mPRACategory)
+        sheet.write(row, 7, g.job_name)
+        sheet.write(row, 8, g.activity_name)
+        sheet.write(row, 9, g.proj_name_no)
+        sheet.write(row, 19, g.mpra_category)
 
         # Write the SUM formula.
         sheet.write(row, 20, Formula("ROUND(SUM(V{}:GP{}), 0)".format(row + 1, row + 1)))
 
-        # Write ytdActual values for matching resource columns (use the dict created earlier).
+        # Write ytd_actual values for matching resource columns (use the dict created earlier).
         # Use the column index of a matching resource code.
         # If no match found, use the '0000' column (the first).
         for gl_piv in gl_pivs:
             if gl_piv.resource in resource_column_indexes:
-                sheet.write(row, resource_column_indexes[gl_piv.resource], gl_piv.ytdActual)
+                sheet.write(row, resource_column_indexes[gl_piv.resource], gl_piv.ytd_actual)
             else:
-                sheet.write(row, resource_column_start, gl_piv.ytdActual)
+                sheet.write(row, resource_column_start, gl_piv.ytd_actual)
 
         row += 1  # Advance one row, to the next Code ID.
 
@@ -232,7 +232,7 @@ def code_update_report(workbook_ro, workbook, gl, gl_codeids, nc_sp, pvs_sp, fm_
     write_service_priorities(sheet, nc_sp, pvs_sp, fm_sp)
 
     # Sheet 3: Budget area & project sponsor lookup data.
-    # This is a list of unique budgetArea and projectSponsor values, written in
+    # This is a list of unique budget_area and project_sponsor values, written in
     # as reference data for macros.
     sheet = workbook.get_sheet(2)
     write_budget_areas(sheet, ibm)
@@ -258,7 +258,7 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
     sheet.write(1, 0, Formula('HYPERLINK("{}")'.format(settings.IBM_RELOAD_URI)))
     # Insert data:
     for row, data in enumerate(ibm, 3):
-        sheet.write(row, 0, int(data.costCentre), pad3)
+        sheet.write(row, 0, int(data.cost_centre), pad3)
         sheet.write(row, 1, data.account, pad2)
         sheet.write(row, 2, data.service, pad2)
         sheet.write(row, 3, data.activity, pad3)
@@ -270,11 +270,11 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
             sheet.write(row, 5, int(data.job), pad3)
         except ValueError:
             sheet.write(row, 5, data.job, pad3)
-        sheet.write(row, 6, data.budgetArea, data_xf)
-        sheet.write(row, 7, data.projectSponsor, data_xf)
-        sheet.write(row, 8, data.regionalSpecificInfo, data_xf)
-        sheet.write(row, 9, data.servicePriorityID, data_xf)
-        sheet.write(row, 10, data.annualWPInfo, data_xf)
+        sheet.write(row, 6, data.budget_area, data_xf)
+        sheet.write(row, 7, data.project_sponsor, data_xf)
+        sheet.write(row, 8, data.regional_specific_info, data_xf)
+        sheet.write(row, 9, data.service_priority_id, data_xf)
+        sheet.write(row, 10, data.annual_wp_info, data_xf)
     # Make some columns wider
     sheet.col(6).width = 5000
     sheet.col(7).width = 5000
@@ -290,9 +290,9 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
     sheet = workbook.get_sheet(2)
 
     for row, data in enumerate(gl):
-        sheet.write(row, 0, data.gLCode)
-        sheet.write(row, 1, data.shortCode)
-        sheet.write(row, 2, data.shortCodeName)
+        sheet.write(row, 0, data.gl_code)
+        sheet.write(row, 1, data.short_code)
+        sheet.write(row, 2, data.short_code_name)
 
     sheet.col(0).width = 7500
     sheet.col(2).width = 12500
@@ -306,29 +306,29 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
     job_no_num_dict = {}
     current_row = 0
     for row, data in enumerate(gl):
-        if data.job not in jobs or data.jobName not in job_names:
+        if data.job not in jobs or data.job_name not in job_names:
             # sheet.write(current_row, 0, data.job)
-            # sheet.write(current_row, 1, data.jobName)
+            # sheet.write(current_row, 1, data.job_name)
             if data.job.isdigit():
-                job = {"job": int(data.job), "jobName": data.jobName}
+                job = {"job": int(data.job), "job_name": data.job_name}
                 job_dict[current_row] = job
             else:
-                job = {"job": data.job, "jobName": data.jobName}
+                job = {"job": data.job, "job_name": data.job_name}
                 job_no_num_dict[current_row] = job
             jobs.append(data.job)
-            job_names.append(data.jobName)
+            job_names.append(data.job_name)
             current_row += 1
         else:
             pass
     current_row = 0
     for s in sorted(job_dict.items(), key=lambda k_v: k_v[1]["job"]):
         sheet.write(current_row, 0, str(s[1]["job"]))
-        sheet.write(current_row, 1, s[1]["jobName"])
+        sheet.write(current_row, 1, s[1]["job_name"])
         current_row += 1
 
     for s in sorted(job_no_num_dict.items(), key=lambda k_v: k_v[1]["job"]):
         sheet.write(current_row, 0, s[1]["job"])
-        sheet.write(current_row, 1, s[1]["jobName"])
+        sheet.write(current_row, 1, s[1]["job_name"])
         current_row += 1
 
     sheet.col(1).width = 10000
@@ -336,11 +336,11 @@ def reload_report(workbook, ibm, nc_sp, pvs_sp, fm_sp, gl):
 
 
 def write_budget_areas(sheet, ibm):
-    """From a queryset of IBMData objects, write unique budgetArea values
+    """From a queryset of IBMData objects, write unique budget_area values
     to the passed-in worksheet.
     """
     row = 1  # Skip the header row
-    budget_areas = sorted(set(ibm.values_list("budgetArea", "costCentre")))
+    budget_areas = sorted(set(ibm.values_list("budget_area", "cost_centre")))
     for i in budget_areas:
         if i[0]:  # Non-blank only.
             sheet.write(row, 0, i[0])
@@ -349,11 +349,11 @@ def write_budget_areas(sheet, ibm):
 
 
 def write_project_sponsors(sheet, ibm):
-    """From a queryset of IBMData objects, write unique projectSponsor values
+    """From a queryset of IBMData objects, write unique project_sponsor values
     to the passed-in worksheet.
     """
     row = 1  # Skip the header row
-    sponsors = sorted(set(ibm.values_list("projectSponsor", "costCentre")))
+    sponsors = sorted(set(ibm.values_list("project_sponsor", "cost_centre")))
     for i in sponsors:
         if i[0]:  # Non-blank only.
             sheet.write(row, 2, i[0])
@@ -362,11 +362,11 @@ def write_project_sponsors(sheet, ibm):
 
 
 def write_regional_spec_info(sheet, ibm):
-    """From a queryset of IBMData objects, write unique regionalSpecificInfo values
+    """From a queryset of IBMData objects, write unique regional_specific_info values
     to the passed-in worksheet.
     """
     row = 1  # Skip the header row
-    reg_info = sorted(set(ibm.values_list("regionalSpecificInfo", "costCentre")))
+    reg_info = sorted(set(ibm.values_list("regional_specific_info", "cost_centre")))
     for i in reg_info:
         if i[0]:  # Non-blank only.
             sheet.write(row, 4, i[0])
@@ -381,42 +381,42 @@ def write_service_priorities(sheet, nc_sp, pvs_sp, fm_sp):
     row = 0
     # NC service priorities.
     for sp in nc_sp:
-        sheet.write(row, 0, sp.categoryID)
-        sheet.write(row, 1, sp.servicePriorityNo)
-        sheet.write(row, 2, sp.strategicPlanNo)
-        sheet.write(row, 3, sp.corporateStrategyNo)
-        sheet.write(row, 4, sp.assetNo)
+        sheet.write(row, 0, sp.category_id)
+        sheet.write(row, 1, sp.service_priority_no)
+        sheet.write(row, 2, sp.strategic_plan_no)
+        sheet.write(row, 3, sp.corporate_strategy_no)
+        sheet.write(row, 4, sp.asset_no)
         sheet.write(row, 5, sp.asset)
-        sheet.write(row, 6, sp.targetNo)
+        sheet.write(row, 6, sp.target_no)
         sheet.write(row, 7, sp.target)
-        sheet.write(row, 8, sp.actionNo)
+        sheet.write(row, 8, sp.action_no)
         sheet.write(row, 9, sp.action)
-        sheet.write(row, 10, sp.mileNo)
+        sheet.write(row, 10, sp.mile_no)
         sheet.write(row, 11, sp.milestone)
         row += 1
     # PVS service priorities.
     for sp in pvs_sp:
-        sheet.write(row, 0, sp.categoryID)
-        sheet.write(row, 1, sp.servicePriorityNo)
-        sheet.write(row, 2, sp.strategicPlanNo)
-        sheet.write(row, 3, sp.corporateStrategyNo)
+        sheet.write(row, 0, sp.category_id)
+        sheet.write(row, 1, sp.service_priority_no)
+        sheet.write(row, 2, sp.strategic_plan_no)
+        sheet.write(row, 3, sp.corporate_strategy_no)
         sheet.write(row, 4, "")
         sheet.write(row, 5, "")
         sheet.write(row, 6, "")
         sheet.write(row, 7, "")
         sheet.write(row, 8, "")
-        sheet.write(row, 9, sp.servicePriority1)
+        sheet.write(row, 9, sp.service_priority_1)
         sheet.write(row, 10, "")
         sheet.write(row, 11, sp.description)
-        sheet.write(row, 12, sp.pvsExampleAnnWP)
-        sheet.write(row, 13, sp.pvsExampleActNo)
+        sheet.write(row, 12, sp.pvs_example_ann_wp)
+        sheet.write(row, 13, sp.pvs_example_act_no)
         row += 1
     # FM service priorities.
     for sp in fm_sp:
-        sheet.write(row, 0, sp.categoryID)
-        sheet.write(row, 1, sp.servicePriorityNo)
-        sheet.write(row, 2, sp.strategicPlanNo)
-        sheet.write(row, 3, sp.corporateStrategyNo)
+        sheet.write(row, 0, sp.category_id)
+        sheet.write(row, 1, sp.service_priority_no)
+        sheet.write(row, 2, sp.strategic_plan_no)
+        sheet.write(row, 3, sp.corporate_strategy_no)
         sheet.write(row, 4, "")
         sheet.write(row, 5, "")
         sheet.write(row, 6, "")
@@ -465,7 +465,7 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
         "Wildfire",
         "Expense Revenue",
         "Fire Activities",
-        "mPRACategory",
+        "mpra_category",
         "Budget Area",
         "Project Sponsor",
         "Corporate Strategy No",
@@ -515,7 +515,7 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
         "Wildfire",
         "Expense Revenue",
         "Fire Activities",
-        "mPRACategory",
+        "mpra_category",
         "Budget Area",
         "Project Sponsor",
         "Corporate Strategy No",
@@ -572,112 +572,112 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
             strategic_plan = None
 
         download_report_row = [
-            glpiv.codeID,
+            glpiv.code_id,
             glpiv.fy,
-            glpiv.downloadPeriod,
-            glpiv.costCentre,
+            glpiv.download_period_str,
+            glpiv.cost_centre,
             glpiv.account,
             glpiv.service,
             glpiv.activity,
             glpiv.resource,
             glpiv.project,
             glpiv.job,
-            glpiv.shortCode,
-            glpiv.shortCodeName,
-            glpiv.gLCode,
-            glpiv.ptdActual,
-            glpiv.ptdBudget,
-            glpiv.ytdActual,
-            glpiv.ytdBudget,
+            glpiv.short_code,
+            glpiv.short_code_name,
+            glpiv.gl_code,
+            glpiv.ptd_actual,
+            glpiv.ptd_budget,
+            glpiv.ytd_actual,
+            glpiv.ytd_budget,
             glpiv.fybudget,
-            glpiv.ytdVariance,
-            glpiv.ccName,
-            glpiv.serviceName,
-            glpiv.jobName,
-            glpiv.resNameNo,
-            glpiv.actNameNo,
-            glpiv.projNameNo,
-            glpiv.regionBranch,
+            glpiv.ytd_variance,
+            glpiv.cc_name,
+            glpiv.service_name,
+            glpiv.job_name,
+            glpiv.res_name_no,
+            glpiv.act_name_no,
+            glpiv.proj_name_no,
+            glpiv.region_branch,
             glpiv.division,
-            glpiv.resourceCategory,
+            glpiv.resource_category,
             glpiv.wildfire,
-            glpiv.expenseRevenue,
-            glpiv.fireActivities,
-            glpiv.mPRACategory,
-            ibmdata.budgetArea if ibmdata else "",
-            ibmdata.projectSponsor if ibmdata else "",
-            corporate_strategy.corporateStrategyNo if corporate_strategy else "",
-            strategic_plan.strategicPlanNo if strategic_plan else "",
-            ibmdata.regionalSpecificInfo if ibmdata else "",
-            ibmdata.servicePriorityID if ibmdata else "",
-            ibmdata.annualWPInfo if ibmdata else "",
+            glpiv.expense_revenue,
+            glpiv.fire_activities,
+            glpiv.mpra_category,
+            ibmdata.budget_area if ibmdata else "",
+            ibmdata.project_sponsor if ibmdata else "",
+            corporate_strategy.corporate_strategy_no if corporate_strategy else "",
+            strategic_plan.strategic_plan_no if strategic_plan else "",
+            ibmdata.regional_specific_info if ibmdata else "",
+            ibmdata.service_priority_id if ibmdata else "",
+            ibmdata.annual_wp_info if ibmdata else "",
             corporate_strategy.description1 if corporate_strategy else "",
             corporate_strategy.description2 if corporate_strategy else "",
-            strategic_plan.directionNo if strategic_plan else "",
+            strategic_plan.direction_no if strategic_plan else "",
             strategic_plan.direction if strategic_plan else "",
-            strategic_plan.aimNo if strategic_plan else "",
+            strategic_plan.aim_no if strategic_plan else "",
             strategic_plan.aim1 if strategic_plan else "",
             strategic_plan.aim2 if strategic_plan else "",
-            strategic_plan.actionNo if strategic_plan else "",
+            strategic_plan.action_no if strategic_plan else "",
             strategic_plan.action if strategic_plan else "",
             service_priority.get_d1() if service_priority else "",
             service_priority.get_d2() if service_priority else "",
         ]
 
         enhanced_report_row = [
-            glpiv.codeID,
+            glpiv.code_id,
             glpiv.fy,
-            glpiv.downloadPeriod,
-            glpiv.costCentre,
+            glpiv.download_period_str,
+            glpiv.cost_centre,
             glpiv.account,
             glpiv.service,
             glpiv.activity,
             glpiv.resource,
             glpiv.project,
             glpiv.job,
-            glpiv.shortCode,
-            glpiv.shortCodeName,
-            glpiv.gLCode,
-            glpiv.ptdActual,
-            glpiv.ytdActual,
-            glpiv.ytdBudget,
+            glpiv.short_code,
+            glpiv.short_code_name,
+            glpiv.gl_code,
+            glpiv.ptd_actual,
+            glpiv.ytd_actual,
+            glpiv.ytd_budget,
             glpiv.fybudget,
-            glpiv.ccName,
-            glpiv.serviceName,
-            glpiv.jobName,
-            glpiv.resNameNo,
-            glpiv.actNameNo,
-            glpiv.projNameNo,
-            glpiv.regionBranch,
+            glpiv.cc_name,
+            glpiv.service_name,
+            glpiv.job_name,
+            glpiv.res_name_no,
+            glpiv.act_name_no,
+            glpiv.proj_name_no,
+            glpiv.region_branch,
             glpiv.division,
-            glpiv.resourceCategory,
+            glpiv.resource_category,
             glpiv.wildfire,
-            glpiv.expenseRevenue,
-            glpiv.fireActivities,
-            glpiv.mPRACategory,
-            ibmdata.budgetArea if ibmdata else "",
-            ibmdata.projectSponsor if ibmdata else "",
-            corporate_strategy.corporateStrategyNo if corporate_strategy else "",
-            strategic_plan.strategicPlanNo if strategic_plan else "",
-            ibmdata.regionalSpecificInfo if ibmdata else "",
-            ibmdata.servicePriorityID if ibmdata else "",
-            ibmdata.annualWPInfo if ibmdata else "",
+            glpiv.expense_revenue,
+            glpiv.fire_activities,
+            glpiv.mpra_category,
+            ibmdata.budget_area if ibmdata else "",
+            ibmdata.project_sponsor if ibmdata else "",
+            corporate_strategy.corporate_strategy_no if corporate_strategy else "",
+            strategic_plan.strategic_plan_no if strategic_plan else "",
+            ibmdata.regional_specific_info if ibmdata else "",
+            ibmdata.service_priority_id if ibmdata else "",
+            ibmdata.annual_wp_info if ibmdata else "",
             corporate_strategy.description1 if corporate_strategy else "",
             corporate_strategy.description2 if corporate_strategy else "",
-            strategic_plan.directionNo if strategic_plan else "",
+            strategic_plan.direction_no if strategic_plan else "",
             strategic_plan.direction if strategic_plan else "",
-            strategic_plan.aimNo if strategic_plan else "",
+            strategic_plan.aim_no if strategic_plan else "",
             strategic_plan.aim1 if strategic_plan else "",
             strategic_plan.aim2 if strategic_plan else "",
-            strategic_plan.actionNo if strategic_plan else "",
+            strategic_plan.action_no if strategic_plan else "",
             strategic_plan.action if strategic_plan else "",
             service_priority.get_d1() if service_priority else "",
             service_priority.get_d2() if service_priority else "",
-            ibmdata.priorityActionNo if ibmdata else "",
-            ibmdata.priorityLevel if ibmdata else "",
-            ibmdata.marineKPI if ibmdata else "",
-            ibmdata.regionProject if ibmdata else "",
-            ibmdata.regionDescription if ibmdata else "",
+            ibmdata.priority_action_no if ibmdata else "",
+            ibmdata.priority_level if ibmdata else "",
+            ibmdata.marine_kpi if ibmdata else "",
+            ibmdata.region_project if ibmdata else "",
+            ibmdata.region_description if ibmdata else "",
         ]
 
         department_programs_row = [

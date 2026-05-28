@@ -7,7 +7,7 @@
         $.ajax({
             type: "GET",
             url: "{% url 'ibms:ajax_glpivdownload_costcentre' %}",
-            data: {"financialYear": finYear},
+            data: {"financial_year": finYear},
             success: function(data) {
                 select = $("select#id_cost_centre")[0];
                 select.options.length = 0;
@@ -26,7 +26,7 @@
         $.ajax({
             type: "GET",
             url: "{% url 'ibms:ajax_glpivdownload_regionbranch' %}",
-            data: {"financialYear": finYear},
+            data: {"financial_year": finYear},
             success: function(data) {
                 select = $("select#id_region")[0];
                 select.options.length = 0;
@@ -45,7 +45,7 @@
         $.ajax({
             type: "GET",
             url: "{% url 'ibms:ajax_glpivdownload_division' %}",
-            data: {"financialYear": finYear},
+            data: {"financial_year": finYear},
             success: function(data) {
                 select = $("select#id_division")[0];
                 select.options.length = 0;

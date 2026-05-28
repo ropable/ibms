@@ -147,7 +147,7 @@ class IbmsViewsTest(IbmsTestCase):
         mixer.blend(GLPivDownload, fy=self.fy)
         self.assertTrue(GLPivDownload.objects.exists())
         url = reverse("ibms:clearglpivot")
-        resp = self.client.post(url, data={"financial_year": self.fy.financialYear}, follow=True)
+        resp = self.client.post(url, data={"financial_year": self.fy.financial_year}, follow=True)
         self.assertEqual(resp.status_code, 200)
         # Conclude with no GLPivDownload data.
         self.assertFalse(GLPivDownload.objects.exists())
@@ -176,7 +176,7 @@ class IbmsViewsTest(IbmsTestCase):
         mixer.blend(
             IBMData,
             fy=self.fy,
-            ibmIdentifier="151-01-11-GE1-0000-000",
+            ibm_identifier="151-01-11-GE1-0000-000",
         )
         # Start with zero DepartmentProgram objects.
         self.assertEqual(DepartmentProgram.objects.count(), 0)
@@ -192,7 +192,7 @@ class IbmsViewsTest(IbmsTestCase):
     def test_ibms_ajax_endpoints(self):
         """Test that the IBMS AJAX endpoints work"""
         for _ in range(20):
-            mixer.blend(GLPivDownload, codeID=self.ibmdata.ibmIdentifier[0:29], downloadPeriod=date.today().strftime("%d/%m/%Y"))
+            mixer.blend(GLPivDownload, code_id=self.ibmdata.ibm_identifier[0:29], download_period_str=date.today().strftime("%d/%m/%Y"))
 
         for endpoint in [
             "ajax_glpivdownload_financialyear",
@@ -208,7 +208,7 @@ class IbmsViewsTest(IbmsTestCase):
             "ajax_mappings",
         ]:
             url = reverse(f"ibms:{endpoint}")
-            response = self.client.get(url, {"financialYear": self.fy.financialYear})
+            response = self.client.get(url, {"financial_year": self.fy.financial_year})
             self.assertEqual(response.status_code, 200)
 
 
@@ -229,7 +229,7 @@ class ClearGLPivotViewTest(IbmsTestCase):
         mixer.blend(GLPivDownload, fy=self.fy)
 
         url = reverse("ibms:clearglpivot")
-        response = self.client.post(url, data={"financial_year": self.fy.financialYear, "confirm": "Confirm"}, follow=True)
+        response = self.client.post(url, data={"financial_year": self.fy.financial_year, "confirm": "Confirm"}, follow=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Deleted 3 GL Pivot entries")
@@ -242,7 +242,7 @@ class ClearGLPivotViewTest(IbmsTestCase):
         initial_count = GLPivDownload.objects.count()
 
         url = reverse("ibms:clearglpivot")
-        response = self.client.post(url, data={"financial_year": self.fy.financialYear, "cancel": "Cancel"}, follow=True)
+        response = self.client.post(url, data={"financial_year": self.fy.financial_year, "cancel": "Cancel"}, follow=True)
 
         # Should redirect without deleting
         self.assertEqual(response.status_code, 200)
@@ -255,11 +255,11 @@ class ClearGLPivotViewTest(IbmsTestCase):
         mixer.blend(GLPivDownload, fy=self.fy)
 
         # Create records for different FY
-        other_fy = mixer.blend(FinancialYear, financialYear="2023/24")
+        other_fy = mixer.blend(FinancialYear, financial_year="2023/24")
         mixer.blend(GLPivDownload, fy=other_fy)
 
         url = reverse("ibms:clearglpivot")
-        response = self.client.post(url, data={"financial_year": self.fy.financialYear, "confirm": "Confirm"}, follow=True)
+        response = self.client.post(url, data={"financial_year": self.fy.financial_year, "confirm": "Confirm"}, follow=True)
 
         # Only 2 records (current FY) should be deleted, 1 (other FY) remains
         self.assertEqual(GLPivDownload.objects.count(), 1)
@@ -273,7 +273,7 @@ class ClearGLPivotViewTest(IbmsTestCase):
         mixer.blend(GLPivDownload, fy=self.fy)
 
         url = reverse("ibms:clearglpivot")
-        response = self.client.post(url, data={"financial_year": self.fy.financialYear}, follow=True)
+        response = self.client.post(url, data={"financial_year": self.fy.financial_year}, follow=True)
 
         # Record should not be deleted
         self.assertTrue(GLPivDownload.objects.exists())
@@ -299,7 +299,7 @@ class UploadViewTest(IbmsTestCase):
             data={
                 "upload_file_type": "ibm_data",
                 "upload_file": json_file,
-                "financial_year": self.fy.financialYear,
+                "financial_year": self.fy.financial_year,
             },
             follow=True,
         )
@@ -318,7 +318,7 @@ class UploadViewTest(IbmsTestCase):
                 data={
                     "upload_file_type": "ibm_data",
                     "upload_file": upload,
-                    "financial_year": self.fy.financialYear,
+                    "financial_year": self.fy.financial_year,
                 },
                 follow=True,
             )
@@ -348,7 +348,7 @@ class UploadViewTest(IbmsTestCase):
                 data={
                     "upload_file_type": "corp_strategy",
                     "upload_file": upload,
-                    "financial_year": self.fy.financialYear,
+                    "financial_year": self.fy.financial_year,
                 },
                 follow=True,
             )
@@ -370,8 +370,8 @@ class DataAmendmentListViewTest(IbmsTestCase):
             mixer.blend(
                 IBMData,
                 fy=self.fy,
-                ibmIdentifier=f"TEST_{i:03d}",
-                costCentre=f"{i:03d}",
+                ibm_identifier=f"TEST_{i:03d}",
+                cost_centre=f"{i:03d}",
             )
 
     def test_data_amendment_list_get(self):
@@ -384,9 +384,9 @@ class DataAmendmentListViewTest(IbmsTestCase):
         """DataAmendmentListView should contain IBMData objects"""
         ibmdata = IBMData.objects.first()
         url = reverse("ibms:data_amendment_list")
-        response = self.client.get(url, {"cost_centre": ibmdata.costCentre})
+        response = self.client.get(url, {"cost_centre": ibmdata.cost_centre})
         # Should contain IBMData records
-        self.assertContains(response, ibmdata.ibmIdentifier)
+        self.assertContains(response, ibmdata.ibm_identifier)
 
 
 class DataAmendmentUpdateViewTest(IbmsTestCase):
@@ -403,14 +403,14 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.ibmdata_to_amend = mixer.blend(
             IBMData,
             fy=self.fy,
-            ibmIdentifier="AMEND_001",
-            costCentre="999",
+            ibm_identifier="AMEND_001",
+            cost_centre="999",
             account=99,
             service=99,
             activity="ABC",
             project="1234",
             job="123",
-            servicePriorityID="Fire-01",
+            service_priority_id="Fire-01",
         )
 
     def test_data_amendment_update_get(self):
@@ -424,24 +424,24 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         """Test that the DataAmendmentList view returns filtered records"""
         url = reverse("ibms:data_amendment_list")
         response = self.client.get(url, {"cost_centre": "999"})
-        self.assertContains(response, self.ibmdata.ibmIdentifier)
+        self.assertContains(response, self.ibmdata.ibm_identifier)
 
     def test_data_amendment_list_rule_budgetarea(self):
-        """Test the DataAmendmentList view business rule: filter out blank budgetArea"""
-        ibmdata2 = mixer.blend(IBMData, fy=self.fy, costCentre="999", budgetArea="", activity="AB1", projectSponsor=self.fake.name())
+        """Test the DataAmendmentList view business rule: filter out blank budget_area"""
+        ibmdata2 = mixer.blend(IBMData, fy=self.fy, cost_centre="999", budget_area="", activity="AB1", project_sponsor=self.fake.name())
         url = reverse("ibms:data_amendment_list")
         response = self.client.get(url, {"cost_centre": "999"})
         # The new IBMData record shouldn't be in the response.
-        self.assertNotContains(response, ibmdata2.ibmIdentifier)
-        self.assertContains(response, self.ibmdata.ibmIdentifier)
+        self.assertNotContains(response, ibmdata2.ibm_identifier)
+        self.assertContains(response, self.ibmdata.ibm_identifier)
 
     def test_data_amendment_list_rule_dj0(self):
         """Test the DataAmendmentList view business rule: filter out activity DJ0"""
-        ibmdata2 = mixer.blend(IBMData, fy=self.fy, costCentre="999", activity="DJ0", projectSponsor=self.fake.name())
+        ibmdata2 = mixer.blend(IBMData, fy=self.fy, cost_centre="999", activity="DJ0", project_sponsor=self.fake.name())
         url = reverse("ibms:data_amendment_list")
         response = self.client.get(url, {"cost_centre": "999"})
-        self.assertNotContains(response, ibmdata2.ibmIdentifier)
-        self.assertContains(response, self.ibmdata.ibmIdentifier)
+        self.assertNotContains(response, ibmdata2.ibm_identifier)
+        self.assertContains(response, self.ibmdata.ibm_identifier)
 
     def test_data_amendment_update_get(self):
         """Test that the DataAmendmentUpdate view responds"""
@@ -459,10 +459,10 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
     def test_data_amendment_update_post(self):
         """Test that the DataAmendmentUpdate view responds correctly to a POST request"""
         url = reverse("ibms:data_amendment_update", kwargs={"pk": self.ibmdata.pk})
-        response = self.client.post(url, {"budgetArea": "Operations"})
+        response = self.client.post(url, {"budget_area": "Operations"})
         self.assertEqual(response.status_code, 302)
         ibmdata = IBMData.objects.first()
-        self.assertEqual(ibmdata.budgetArea, "Operations")
+        self.assertEqual(ibmdata.budget_area, "Operations")
 
     def test_data_amendment_update_creates_revision(self):
         """DataAmendmentUpdateView should create an audit trail (versions) via django-reversion"""
@@ -470,11 +470,11 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         response = self.client.post(
             url,
             data={
-                "budgetArea": "Updated budget area",
-                "projectSponsor": "Updated project sponsor",
-                "regionalSpecificInfo": "Updated info",
-                "servicePriorityID": "Fire-01",
-                "annualWPInfo": "Updated WP info",
+                "budget_area": "Updated budget area",
+                "project_sponsor": "Updated project sponsor",
+                "regional_specific_info": "Updated info",
+                "service_priority_id": "Fire-01",
+                "annual_wp_info": "Updated WP info",
             },
             follow=True,
         )

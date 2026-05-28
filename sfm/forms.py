@@ -22,7 +22,7 @@ class SFMCostCentreModelChoiceField(forms.ModelChoiceField):
 
 
 class OutputEntryForm(HelperForm):
-    financial_year = forms.ModelChoiceField(label="Financial Year", queryset=FinancialYear.objects.all().order_by("financialYear"))
+    financial_year = forms.ModelChoiceField(label="Financial Year", queryset=FinancialYear.objects.all().order_by("financial_year"))
     quarter = QtrModelChoiceField(label="Quarter", queryset=Quarter.objects.none())
     region = forms.ChoiceField(
         choices=[(None, "---------")] + REGION_CHOICES,
@@ -108,7 +108,7 @@ class OutputUploadForm(HelperForm):
         ("costcentres", "Cost Centres"),
         ("measurementvalues", "Measurement values"),
     )
-    financial_year = forms.ModelChoiceField(queryset=FinancialYear.objects.all().order_by("financialYear"), required=True)
+    financial_year = forms.ModelChoiceField(queryset=FinancialYear.objects.all().order_by("financial_year"), required=True)
     upload_file_type = forms.ChoiceField(choices=FILE_CHOICES, required=True)
     upload_file = forms.FileField(label="Select file")
 
@@ -125,7 +125,7 @@ class OutputUploadForm(HelperForm):
 
 class FMOutputReportForm(HelperForm):
     financial_year = forms.ModelChoiceField(
-        label="Financial Year", required=True, queryset=FinancialYear.objects.all().order_by("financialYear")
+        label="Financial Year", required=True, queryset=FinancialYear.objects.all().order_by("financial_year")
     )
     quarter = QtrModelChoiceField(label="Quarter", queryset=Quarter.objects.all(), required=True)
     cost_centre = SFMCostCentreModelChoiceField(

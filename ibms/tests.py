@@ -29,18 +29,18 @@ class IbmsTestCase(TestCase):
             last_name=self.fake.last_name(),
         )
         self.user.save()
-        self.fy = mixer.blend(FinancialYear, financialYear="2024/25")
+        self.fy = mixer.blend(FinancialYear, financial_year="2024/25")
         self.ibmdata = mixer.blend(
             IBMData,
             fy=self.fy,
             account=randint(1, 99),
             service=randint(10, 99),
-            costCentre="999",
-            budgetArea="Admin",
+            cost_centre="999",
+            budget_area="Admin",
             activity="AA1",
             project="AA11",
             job="ABC",
-            projectSponsor=self.fake.name(),
+            project_sponsor=self.fake.name(),
         )
         self.client.login(username="testuser", password="test")
 
