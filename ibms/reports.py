@@ -430,9 +430,20 @@ def write_service_priorities(sheet, nc_sp, pvs_sp, fm_sp):
         row += 1
 
 
-def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
-    """The Download Report views all return variations on the same CSV output, with additional columns for some reports."""
-    writer = csv.writer(response)
+class _Echo:
+    """A pseudo-buffer that implements the write interface expected by csv.writer, returning each value rather than storing it."""
+
+    def write(self, value):
+        return value
+
+
+def download_report(glpiv_qs, enhanced=False, dept_programs=False):
+    """Generator that yields CSV-formatted rows for the download reports.
+
+    Intended to be consumed by StreamingHttpResponse so that rows are sent
+    to the client incrementally rather than buffering the entire CSV in memory.
+    """
+    writer = csv.writer(_Echo())
 
     # NOTE: the 'normal' and 'enhanced' download reports vary a little, with the enhanced report having two fewer columns.
     download_report_headers = [
@@ -548,13 +559,13 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
         "Dept Program 3",
     ]
 
-    # Write the CSV header row.
+    # Yield the CSV header row.
     if enhanced and dept_programs:
-        writer.writerow(enhanced_report_headers + department_programs_headers)
+        yield writer.writerow(enhanced_report_headers + department_programs_headers)
     elif enhanced:
-        writer.writerow(enhanced_report_headers)
+        yield writer.writerow(enhanced_report_headers)
     else:
-        writer.writerow(download_report_headers)
+        yield writer.writerow(download_report_headers)
 
     # Evaluate the queryset once so we can batch-prefetch the GenericForeignKey on ibmdata.
     # select_related("ibmdata", "department_program") is expected to already be set by the caller.
@@ -726,6 +737,4 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
                 service_priority.get_d2() if service_priority else "",
             ]
 
-        writer.writerow(row)
-
-    return response
+        yield writer.writerow(row)

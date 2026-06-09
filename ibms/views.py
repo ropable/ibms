@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import FieldDoesNotExist
 from django.db import connection
-from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
+from django.http import HttpResponse, HttpResponseBadRequest, QueryDict, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -194,9 +194,8 @@ class DownloadView(IbmsFormView):
 
         glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
 
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_download.csv"
-        response = download_report(glpiv_qs, response)
         return response
 
 
@@ -222,9 +221,8 @@ class DownloadEnhancedView(DownloadView):
 
         glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
 
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_enhanced_download.csv"
-        response = download_report(glpiv_qs, response, enhanced=True)
         return response
 
 
@@ -259,9 +257,8 @@ class DownloadDeptProgramView(DownloadView):
 
         glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
 
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True, dept_programs=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_department_program_download.csv"
-        response = download_report(glpiv_qs, response, enhanced=True, dept_programs=True)
         return response
 
 
