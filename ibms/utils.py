@@ -175,8 +175,8 @@ def ibms_import_from_csv(
                 record_count += 1
                 return_str = "IBM Data"
                 with create_revision():
-                    if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0])).exists():
-                        ibmdata = IBMData.objects.get(fy=fy, ibmIdentifier=str(row[0]))
+                    if IBMData.objects.filter(fy=fy, ibmIdentifier=str(row[0]).upper()).exists():
+                        ibmdata = IBMData.objects.get(fy=fy, ibmIdentifier=str(row[0]).upper())
                         ibmdata.costCentre = row[1]
                         ibmdata.account = row[2]
                         ibmdata.service = row[3]
@@ -198,7 +198,7 @@ def ibms_import_from_csv(
                     else:
                         data = {
                             "fy": fy,
-                            "ibmIdentifier": validate_char_field("ibmIdentifier", 50, row[0]),
+                            "ibmIdentifier": validate_char_field("ibmIdentifier", 50, row[0].upper()),
                             "costCentre": validate_char_field("costCentre", 4, row[1]),
                             "account": validate_integer_field("account", row[2]),
                             "service": validate_integer_field("service", row[3]),

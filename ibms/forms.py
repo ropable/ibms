@@ -6,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 
 from ibms.models import (
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -13,7 +14,6 @@ from ibms.models import (
     PVSServicePriority,
     SFMServicePriority,
 )
-from ibms.models import FinancialYear
 
 
 def get_generic_choices(model, key, allow_null=False):

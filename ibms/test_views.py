@@ -115,6 +115,26 @@ class IbmsViewsTest(IbmsTestCase):
         # Conclude with 5 IBMData objects.
         self.assertEqual(IBMData.objects.count(), 5)
 
+    def test_upload_ibmdata_ibmidentifier_uppercased(self):
+        """Confirm that IBMData imported from CSV always has ibmIdentifier uppercased."""
+        self.ibmdata.delete()
+        url = reverse("ibms:upload")
+        # Build a CSV whose ibmIdentifier column is intentionally lowercase/mixed-case.
+        csv_content = (
+            "ibmIdentifier,costCentre,account,service,activity,project,job,"
+            "budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,"
+            "annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription\r\n"
+            "418-01-12-gc2-gas1-945,418,01,12,gc2,gas1,945,Test Area,Test Sponsor,,,,,,,Test Project,Test Description\r\n"
+            "419-01-24-Cc1-2910-p91,419,01,24,Cc1,2910,p91,Test Area 2,Test Sponsor 2,,,,,,,Test Project 2,Test Description 2\r\n"
+        )
+        upload = SimpleUploadedFile("ibmdata_upload.csv", csv_content.encode("utf-8"), content_type="text/csv")
+        resp = self.client.post(url, data={"upload_file_type": "ibm_data", "upload_file": upload, "financial_year": "2024/25"}, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        for ibmdata in IBMData.objects.all():
+            self.assertEqual(
+                ibmdata.ibmIdentifier, ibmdata.ibmIdentifier.upper(), f"ibmIdentifier '{ibmdata.ibmIdentifier}' is not uppercased"
+            )
+
     def test_save_sets_modifier_from_middleware(self):
         self.ibmdata.delete()
         url = reverse("ibms:upload")

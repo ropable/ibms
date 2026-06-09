@@ -21,3 +21,4 @@ logs/
 
 .python-version
 .artifacts/
+.vscode/

@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import FieldDoesNotExist
 from django.db import connection
-from django.http import HttpResponse, HttpResponseBadRequest, QueryDict
+from django.http import HttpResponse, HttpResponseBadRequest, QueryDict, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -31,11 +31,10 @@ from ibms.forms import (
     ManagerCodeUpdateForm,
     UploadForm,
 )
-from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
+from ibms.models import FinancialYear, GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
 from ibms.tasks import process_uploaded_csv
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
-from ibms.models import FinancialYear
 
 LOGGER = logging.getLogger("ibms")
 
@@ -193,11 +192,8 @@ class DownloadView(IbmsFormView):
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
-
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_download.csv"
-        response = download_report(glpiv_qs, response)
         return response
 
 
@@ -221,11 +217,8 @@ class DownloadEnhancedView(DownloadView):
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
-
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_enhanced_download.csv"
-        response = download_report(glpiv_qs, response, enhanced=True)
         return response
 
 
@@ -258,11 +251,8 @@ class DownloadDeptProgramView(DownloadView):
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
-
-        response = HttpResponse(content_type="text/csv")
+        response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True, dept_programs=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_department_program_download.csv"
-        response = download_report(glpiv_qs, response, enhanced=True, dept_programs=True)
         return response
 
 
