@@ -1,7 +1,9 @@
 import csv
+from collections import defaultdict
 from copy import copy
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Sum
 from xlrd import cellname
 from xlwt import Formula, XFStyle, easyxf
@@ -554,8 +556,44 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
     else:
         writer.writerow(download_report_headers)
 
-    for glpiv in glpiv_qs:
-        # For each object in the passed-in queryset, construct row content.
+    # Evaluate the queryset once so we can batch-prefetch the GenericForeignKey on ibmdata.
+    # select_related("ibmdata", "department_program") is expected to already be set by the caller.
+    glpiv_list = list(glpiv_qs)
+
+    # Build a cache of service priority objects to avoid N+1 queries on the GenericForeignKey.
+    # Group unique ibmdata objects by their (content_type_id, object_id) pair.
+    ct_to_obj_ids: dict[int, list[int]] = defaultdict(list)
+    ibmdata_objects: dict[int, object] = {}
+    seen_ibmdata_pks: set[int] = set()
+    for glpiv in glpiv_list:
+        ibm = glpiv.ibmdata
+        if ibm and ibm.pk not in seen_ibmdata_pks:
+            seen_ibmdata_pks.add(ibm.pk)
+            ibmdata_objects[ibm.pk] = ibm
+            if ibm.content_type_id and ibm.object_id:
+                ct_to_obj_ids[ibm.content_type_id].append(ibm.object_id)
+
+    # For each content type, fetch all referenced service priority objects in a single query,
+    # resolving corporate_strategy and strategic_plan via select_related.
+    sp_cache: dict[tuple[int, int], object] = {}
+    for ct_id, obj_ids in ct_to_obj_ids.items():
+        try:
+            model_class = ContentType.objects.get_for_id(ct_id).model_class()
+            if model_class is not None:
+                for sp in model_class.objects.filter(pk__in=obj_ids).select_related("corporate_strategy", "strategic_plan"):
+                    sp_cache[(ct_id, sp.pk)] = sp
+        except Exception:
+            pass
+
+    # Attach the prefetched service priority to each ibmdata instance to prevent GFK re-queries.
+    for ibm in ibmdata_objects.values():
+        if ibm.content_type_id and ibm.object_id:
+            sp = sp_cache.get((ibm.content_type_id, ibm.object_id))
+            if sp is not None:
+                ibm.service_priority = sp
+
+    for glpiv in glpiv_list:
+        # For each object in the evaluated list, construct row content.
         department_program = glpiv.department_program
         ibmdata = glpiv.ibmdata
 
@@ -571,127 +609,123 @@ def download_report(glpiv_qs, response, enhanced=False, dept_programs=False):
             corporate_strategy = None
             strategic_plan = None
 
-        download_report_row = [
-            glpiv.codeID,
-            glpiv.fy,
-            glpiv.downloadPeriod,
-            glpiv.costCentre,
-            glpiv.account,
-            glpiv.service,
-            glpiv.activity,
-            glpiv.resource,
-            glpiv.project,
-            glpiv.job,
-            glpiv.shortCode,
-            glpiv.shortCodeName,
-            glpiv.gLCode,
-            glpiv.ptdActual,
-            glpiv.ptdBudget,
-            glpiv.ytdActual,
-            glpiv.ytdBudget,
-            glpiv.fybudget,
-            glpiv.ytdVariance,
-            glpiv.ccName,
-            glpiv.serviceName,
-            glpiv.jobName,
-            glpiv.resNameNo,
-            glpiv.actNameNo,
-            glpiv.projNameNo,
-            glpiv.regionBranch,
-            glpiv.division,
-            glpiv.resourceCategory,
-            glpiv.wildfire,
-            glpiv.expenseRevenue,
-            glpiv.fireActivities,
-            glpiv.mPRACategory,
-            ibmdata.budgetArea if ibmdata else "",
-            ibmdata.projectSponsor if ibmdata else "",
-            corporate_strategy.corporateStrategyNo if corporate_strategy else "",
-            strategic_plan.strategicPlanNo if strategic_plan else "",
-            ibmdata.regionalSpecificInfo if ibmdata else "",
-            ibmdata.servicePriorityID if ibmdata else "",
-            ibmdata.annualWPInfo if ibmdata else "",
-            corporate_strategy.description1 if corporate_strategy else "",
-            corporate_strategy.description2 if corporate_strategy else "",
-            strategic_plan.directionNo if strategic_plan else "",
-            strategic_plan.direction if strategic_plan else "",
-            strategic_plan.aimNo if strategic_plan else "",
-            strategic_plan.aim1 if strategic_plan else "",
-            strategic_plan.aim2 if strategic_plan else "",
-            strategic_plan.actionNo if strategic_plan else "",
-            strategic_plan.action if strategic_plan else "",
-            service_priority.get_d1() if service_priority else "",
-            service_priority.get_d2() if service_priority else "",
-        ]
-
-        enhanced_report_row = [
-            glpiv.codeID,
-            glpiv.fy,
-            glpiv.downloadPeriod,
-            glpiv.costCentre,
-            glpiv.account,
-            glpiv.service,
-            glpiv.activity,
-            glpiv.resource,
-            glpiv.project,
-            glpiv.job,
-            glpiv.shortCode,
-            glpiv.shortCodeName,
-            glpiv.gLCode,
-            glpiv.ptdActual,
-            glpiv.ytdActual,
-            glpiv.ytdBudget,
-            glpiv.fybudget,
-            glpiv.ccName,
-            glpiv.serviceName,
-            glpiv.jobName,
-            glpiv.resNameNo,
-            glpiv.actNameNo,
-            glpiv.projNameNo,
-            glpiv.regionBranch,
-            glpiv.division,
-            glpiv.resourceCategory,
-            glpiv.wildfire,
-            glpiv.expenseRevenue,
-            glpiv.fireActivities,
-            glpiv.mPRACategory,
-            ibmdata.budgetArea if ibmdata else "",
-            ibmdata.projectSponsor if ibmdata else "",
-            corporate_strategy.corporateStrategyNo if corporate_strategy else "",
-            strategic_plan.strategicPlanNo if strategic_plan else "",
-            ibmdata.regionalSpecificInfo if ibmdata else "",
-            ibmdata.servicePriorityID if ibmdata else "",
-            ibmdata.annualWPInfo if ibmdata else "",
-            corporate_strategy.description1 if corporate_strategy else "",
-            corporate_strategy.description2 if corporate_strategy else "",
-            strategic_plan.directionNo if strategic_plan else "",
-            strategic_plan.direction if strategic_plan else "",
-            strategic_plan.aimNo if strategic_plan else "",
-            strategic_plan.aim1 if strategic_plan else "",
-            strategic_plan.aim2 if strategic_plan else "",
-            strategic_plan.actionNo if strategic_plan else "",
-            strategic_plan.action if strategic_plan else "",
-            service_priority.get_d1() if service_priority else "",
-            service_priority.get_d2() if service_priority else "",
-            ibmdata.priorityActionNo if ibmdata else "",
-            ibmdata.priorityLevel if ibmdata else "",
-            ibmdata.marineKPI if ibmdata else "",
-            ibmdata.regionProject if ibmdata else "",
-            ibmdata.regionDescription if ibmdata else "",
-        ]
-
-        department_programs_row = [
-            department_program.dept_program1 if department_program else "",
-            department_program.dept_program2 if department_program else "",
-            department_program.dept_program3 if department_program else "",
-        ]
-
-        # Write the report output rows.
-        if enhanced and dept_programs:
-            writer.writerow(enhanced_report_row + department_programs_row)
-        elif enhanced:
-            writer.writerow(enhanced_report_row)
+        # Construct the row: either normal, enhanced, or enhanced + department programs
+        if enhanced:
+            row = [
+                glpiv.codeID,
+                glpiv.fy,
+                glpiv.downloadPeriod,
+                glpiv.costCentre,
+                glpiv.account,
+                glpiv.service,
+                glpiv.activity,
+                glpiv.resource,
+                glpiv.project,
+                glpiv.job,
+                glpiv.shortCode,
+                glpiv.shortCodeName,
+                glpiv.gLCode,
+                glpiv.ptdActual,
+                glpiv.ytdActual,
+                glpiv.ytdBudget,
+                glpiv.fybudget,
+                glpiv.ccName,
+                glpiv.serviceName,
+                glpiv.jobName,
+                glpiv.resNameNo,
+                glpiv.actNameNo,
+                glpiv.projNameNo,
+                glpiv.regionBranch,
+                glpiv.division,
+                glpiv.resourceCategory,
+                glpiv.wildfire,
+                glpiv.expenseRevenue,
+                glpiv.fireActivities,
+                glpiv.mPRACategory,
+                ibmdata.budgetArea if ibmdata else "",
+                ibmdata.projectSponsor if ibmdata else "",
+                corporate_strategy.corporateStrategyNo if corporate_strategy else "",
+                strategic_plan.strategicPlanNo if strategic_plan else "",
+                ibmdata.regionalSpecificInfo if ibmdata else "",
+                ibmdata.servicePriorityID if ibmdata else "",
+                ibmdata.annualWPInfo if ibmdata else "",
+                corporate_strategy.description1 if corporate_strategy else "",
+                corporate_strategy.description2 if corporate_strategy else "",
+                strategic_plan.directionNo if strategic_plan else "",
+                strategic_plan.direction if strategic_plan else "",
+                strategic_plan.aimNo if strategic_plan else "",
+                strategic_plan.aim1 if strategic_plan else "",
+                strategic_plan.aim2 if strategic_plan else "",
+                strategic_plan.actionNo if strategic_plan else "",
+                strategic_plan.action if strategic_plan else "",
+                service_priority.get_d1() if service_priority else "",
+                service_priority.get_d2() if service_priority else "",
+                ibmdata.priorityActionNo if ibmdata else "",
+                ibmdata.priorityLevel if ibmdata else "",
+                ibmdata.marineKPI if ibmdata else "",
+                ibmdata.regionProject if ibmdata else "",
+                ibmdata.regionDescription if ibmdata else "",
+            ]
+            if dept_programs:
+                row = row + [
+                    department_program.dept_program1 if department_program else "",
+                    department_program.dept_program2 if department_program else "",
+                    department_program.dept_program3 if department_program else "",
+                ]
         else:
-            writer.writerow(download_report_row)
+            row = [
+                glpiv.codeID,
+                glpiv.fy,
+                glpiv.downloadPeriod,
+                glpiv.costCentre,
+                glpiv.account,
+                glpiv.service,
+                glpiv.activity,
+                glpiv.resource,
+                glpiv.project,
+                glpiv.job,
+                glpiv.shortCode,
+                glpiv.shortCodeName,
+                glpiv.gLCode,
+                glpiv.ptdActual,
+                glpiv.ptdBudget,
+                glpiv.ytdActual,
+                glpiv.ytdBudget,
+                glpiv.fybudget,
+                glpiv.ytdVariance,
+                glpiv.ccName,
+                glpiv.serviceName,
+                glpiv.jobName,
+                glpiv.resNameNo,
+                glpiv.actNameNo,
+                glpiv.projNameNo,
+                glpiv.regionBranch,
+                glpiv.division,
+                glpiv.resourceCategory,
+                glpiv.wildfire,
+                glpiv.expenseRevenue,
+                glpiv.fireActivities,
+                glpiv.mPRACategory,
+                ibmdata.budgetArea if ibmdata else "",
+                ibmdata.projectSponsor if ibmdata else "",
+                corporate_strategy.corporateStrategyNo if corporate_strategy else "",
+                strategic_plan.strategicPlanNo if strategic_plan else "",
+                ibmdata.regionalSpecificInfo if ibmdata else "",
+                ibmdata.servicePriorityID if ibmdata else "",
+                ibmdata.annualWPInfo if ibmdata else "",
+                corporate_strategy.description1 if corporate_strategy else "",
+                corporate_strategy.description2 if corporate_strategy else "",
+                strategic_plan.directionNo if strategic_plan else "",
+                strategic_plan.direction if strategic_plan else "",
+                strategic_plan.aimNo if strategic_plan else "",
+                strategic_plan.aim1 if strategic_plan else "",
+                strategic_plan.aim2 if strategic_plan else "",
+                strategic_plan.actionNo if strategic_plan else "",
+                strategic_plan.action if strategic_plan else "",
+                service_priority.get_d1() if service_priority else "",
+                service_priority.get_d2() if service_priority else "",
+            ]
+
+        writer.writerow(row)
 
     return response

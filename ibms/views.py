@@ -31,11 +31,10 @@ from ibms.forms import (
     ManagerCodeUpdateForm,
     UploadForm,
 )
-from ibms.models import GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
+from ibms.models import FinancialYear, GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
 from ibms.tasks import process_uploaded_csv
 from ibms.utils import get_download_period, process_upload_file, validate_upload_file
-from ibms.models import FinancialYear
 
 LOGGER = logging.getLogger("ibms")
 
