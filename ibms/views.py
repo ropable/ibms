@@ -192,8 +192,6 @@ class DownloadView(IbmsFormView):
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
 
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
-
         response = StreamingHttpResponse(download_report(glpiv_qs), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_download.csv"
         return response
@@ -218,8 +216,6 @@ class DownloadEnhancedView(DownloadView):
             glpiv_qs = glpiv_qs.filter(regionBranch=d["region"])
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
-
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
 
         response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_data_enhanced_download.csv"
@@ -254,8 +250,6 @@ class DownloadDeptProgramView(DownloadView):
             glpiv_qs = glpiv_qs.filter(regionBranch=d["region"])
         elif d.get("division", None):
             glpiv_qs = glpiv_qs.filter(division=d["division"])
-
-        glpiv_qs = glpiv_qs.select_related("ibmdata", "department_program")
 
         response = StreamingHttpResponse(download_report(glpiv_qs, enhanced=True, dept_programs=True), content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=ibms_department_program_download.csv"

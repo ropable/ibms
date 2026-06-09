@@ -567,25 +567,78 @@ def download_report(glpiv_qs, enhanced=False, dept_programs=False):
     else:
         yield writer.writerow(download_report_headers)
 
-    # Evaluate the queryset once so we can batch-prefetch the GenericForeignKey on ibmdata.
-    # select_related("ibmdata", "department_program") is expected to already be set by the caller.
-    glpiv_list = list(glpiv_qs)
+    # Restrict the queryset to only the columns needed for the CSV output.
+    glpiv_qs = glpiv_qs.select_related("fy", "ibmdata", "department_program").only(
+        # GLPivDownload fields used in CSV rows
+        "codeID",
+        "fy__financialYear",
+        "downloadPeriod",
+        "costCentre",
+        "account",
+        "service",
+        "activity",
+        "resource",
+        "project",
+        "job",
+        "shortCode",
+        "shortCodeName",
+        "gLCode",
+        "ptdActual",
+        "ptdBudget",
+        "ytdActual",
+        "ytdBudget",
+        "fybudget",
+        "ytdVariance",
+        "ccName",
+        "serviceName",
+        "jobName",
+        "resNameNo",
+        "actNameNo",
+        "projNameNo",
+        "regionBranch",
+        "division",
+        "resourceCategory",
+        "wildfire",
+        "expenseRevenue",
+        "fireActivities",
+        "mPRACategory",
+        # IBMData: GFK fields needed for service priority cache lookup
+        "ibmdata__content_type_id",
+        "ibmdata__object_id",
+        # IBMData: data fields used in CSV rows
+        "ibmdata__budgetArea",
+        "ibmdata__projectSponsor",
+        "ibmdata__regionalSpecificInfo",
+        "ibmdata__servicePriorityID",
+        "ibmdata__annualWPInfo",
+        "ibmdata__priorityActionNo",
+        "ibmdata__priorityLevel",
+        "ibmdata__marineKPI",
+        "ibmdata__regionProject",
+        "ibmdata__regionDescription",
+        # DepartmentProgram fields used in CSV rows
+        "department_program__dept_program1",
+        "department_program__dept_program2",
+        "department_program__dept_program3",
+    )
 
-    # Build a cache of service priority objects to avoid N+1 queries on the GenericForeignKey.
-    # Group unique ibmdata objects by their (content_type_id, object_id) pair.
+    # Build the service priority cache using a lightweight values_list query so that the main
+    # queryset does not need to be fully evaluated into memory before row iteration begins.
+    ibmdata_gfk_rows = list(
+        glpiv_qs.exclude(ibmdata__isnull=True)
+        .exclude(ibmdata__content_type_id__isnull=True)
+        .exclude(ibmdata__object_id__isnull=True)
+        .values_list("ibmdata_id", "ibmdata__content_type_id", "ibmdata__object_id")
+        .distinct()
+    )
+
     ct_to_obj_ids: dict[int, list[int]] = defaultdict(list)
-    ibmdata_objects: dict[int, object] = {}
-    seen_ibmdata_pks: set[int] = set()
-    for glpiv in glpiv_list:
-        ibm = glpiv.ibmdata
-        if ibm and ibm.pk not in seen_ibmdata_pks:
-            seen_ibmdata_pks.add(ibm.pk)
-            ibmdata_objects[ibm.pk] = ibm
-            if ibm.content_type_id and ibm.object_id:
-                ct_to_obj_ids[ibm.content_type_id].append(ibm.object_id)
+    ibmdata_pk_to_gfk: dict[int, tuple[int, int]] = {}
+    for ibmdata_pk, ct_id, obj_id in ibmdata_gfk_rows:
+        ct_to_obj_ids[ct_id].append(obj_id)
+        ibmdata_pk_to_gfk[ibmdata_pk] = (ct_id, obj_id)
 
-    # For each content type, fetch all referenced service priority objects in a single query,
-    # resolving corporate_strategy and strategic_plan via select_related.
+    # For each content type, fetch all referenced service priority objects in one query.
     sp_cache: dict[tuple[int, int], object] = {}
     for ct_id, obj_ids in ct_to_obj_ids.items():
         try:
@@ -596,20 +649,22 @@ def download_report(glpiv_qs, enhanced=False, dept_programs=False):
         except Exception:
             pass
 
-    # Attach the prefetched service priority to each ibmdata instance to prevent GFK re-queries.
-    for ibm in ibmdata_objects.values():
-        if ibm.content_type_id and ibm.object_id:
-            sp = sp_cache.get((ibm.content_type_id, ibm.object_id))
-            if sp is not None:
-                ibm.service_priority = sp
+    # Service priority cache dict keyed by ibmdata PK for lookup inside the row loop.
+    ibmdata_to_sp: dict[int, object] = {}
+    for ibmdata_pk, (ct_id, obj_id) in ibmdata_pk_to_gfk.items():
+        sp = sp_cache.get((ct_id, obj_id))
+        if sp is not None:
+            ibmdata_to_sp[ibmdata_pk] = sp
 
-    for glpiv in glpiv_list:
-        # For each object in the evaluated list, construct row content.
+    # Use iterator() to stream rows from the database in chunks rather than loading
+    # all model instances into memory at once.
+    for glpiv in glpiv_qs.iterator(chunk_size=500):
+        # For each object, construct row content.
         department_program = glpiv.department_program
         ibmdata = glpiv.ibmdata
 
         if ibmdata:
-            service_priority = ibmdata.service_priority
+            service_priority = ibmdata_to_sp.get(ibmdata.pk)
         else:
             service_priority = None
 
