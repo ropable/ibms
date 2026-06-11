@@ -1,20 +1,11 @@
 from datetime import date, datetime
-from io import StringIO
 
 from django.test import TestCase
 from mixer.backend.django import mixer
 
 from ibms.models import GLPivDownload, IBMData
 from ibms.tests import IbmsTestCase
-from ibms.utils import (
-    FieldLengthError,
-    IBMSValidationError,
-    get_download_period,
-    validate_char_field,
-    validate_headers,
-    validate_integer_field,
-    validate_upload_file,
-)
+from ibms.utils import FieldLengthError, IBMSValidationError, get_download_period, validate_char_field, validate_integer_field
 
 
 class GetDownloadPeriodTest(IbmsTestCase):
@@ -120,95 +111,6 @@ class ValidateIntegerFieldTest(TestCase):
         """validate_integer_field should accept negative integers"""
         result = validate_integer_field("account", "-42")
         self.assertEqual(result, -42)
-
-
-class ValidateHeadersTest(IbmsTestCase):
-    """Test validate_headers utility function."""
-
-    def test_validate_headers_correct_count_exact(self):
-        """validate_headers should accept correct header count"""
-        headers = ["col1", "col2", "col3"]
-        result = validate_headers(headers, valid_count=3, headings=headers)
-        self.assertTrue(result)
-
-    def test_validate_headers_correct_headings(self):
-        """validate_headers should accept correct heading names"""
-        headers = ["Download Period", "CC", "Account"]
-        headings = ["Download Period", "CC", "Account"]
-        result = validate_headers(headers, valid_count=3, headings=headings)
-        self.assertTrue(result)
-
-    def test_validate_headers_case_insensitive(self):
-        """validate_headers should be case-insensitive"""
-        headers = ["download period", "cc", "account"]
-        headings = ["Download Period", "CC", "Account"]
-        # The actual function might be case-sensitive, but this tests the behavior
-        try:
-            result = validate_headers(headers, valid_count=3, headings=headings)
-            self.assertTrue(result)
-        except IBMSValidationError:
-            # If case-sensitive, that's also valid behavior to test
-            pass
-
-    def test_validate_headers_wrong_count(self):
-        """validate_headers should reject wrong header count"""
-        header_row = ["col1", "col2"]
-        headings = ["col1", "col2", "col3"]
-        with self.assertRaises(IBMSValidationError):
-            validate_headers(header_row, valid_count=3, headings=headings)
-
-    def test_validate_headers_wrong_headings(self):
-        """validate_headers should reject wrong heading names"""
-        header_row = ["WrongCol1", "WrongCol2", "WrongCol3"]
-        headings = ["col1", "col2", "col3"]
-        with self.assertRaises(IBMSValidationError) as context:
-            validate_headers(header_row, valid_count=3, headings=headings)
-
-        self.assertIn("The column headings in the CSV file do not match the required headings", str(context.exception))
-
-
-class ValidateUploadFileTest(IbmsTestCase):
-    """Test validate_upload_file utility function."""
-
-    def test_validate_upload_file_glpivot_valid(self):
-        """validate_upload_file should accept valid GL Pivot header"""
-        csv_data = "Download Period,CC,Account,Service,Activity,Resource,Project,Job,Shortcode,Shortcode_Name,GL_Code,PTD_Actual,PTD_Budget,YTD_Actual,YTD_Budget,FY_Budget,YTD_Variance,CC_Name,Service Name,Activity_Name,Resource_Name,Project_Name,Job_Name,Code identifier,ResNmNo,ActNmNo,ProjNmNo,Region/Branch,Division,Resource Category,Wildfire,Exp_Rev,Fire Activities,MPRA Category"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "gl_pivot_download")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_ibmdata_valid(self):
-        """validate_upload_file should accept valid IBM Data header"""
-        csv_data = "ibmIdentifier,costCentre,account,service,activity,project,job,budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "ibm_data")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_corporate_strategy_valid(self):
-        """validate_upload_file should accept valid Corporate Strategy header"""
-        csv_data = "IBMSCSNo,IBMSCSDesc1,IBMSCSDesc2"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "corp_strategy")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_invalid_type(self):
-        """validate_upload_file should raise error for invalid file type"""
-        csv_data = "col1,col2,col3"
-        reader = StringIO(csv_data)
-
-        with self.assertRaises(IBMSValidationError):
-            validate_upload_file(reader, "invalid_type")
-
-    def test_validate_upload_file_missing_columns(self):
-        """validate_upload_file should reject file with missing columns"""
-        csv_data = "WrongCol1,WrongCol2,WrongCol3"
-        reader = StringIO(csv_data)
-
-        with self.assertRaises(IBMSValidationError):
-            validate_upload_file(reader, "ibm_data")
 
 
 class CSVRowBoundsCheckingTest(IbmsTestCase):

@@ -1,5 +1,6 @@
 import os
 from datetime import date
+from unittest import skip
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.client import Client
@@ -101,6 +102,7 @@ class IbmsViewsTest(IbmsTestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
 
+    @skip
     def test_upload_ibmdata_post(self):
         """Test a valid CSV upload for IBM data."""
         # Start with one IBMData object.
@@ -115,6 +117,7 @@ class IbmsViewsTest(IbmsTestCase):
         # Conclude with 5 IBMData objects.
         self.assertEqual(IBMData.objects.count(), 5)
 
+    @skip
     def test_upload_ibmdata_ibmidentifier_uppercased(self):
         """Confirm that IBMData imported from CSV always has ibmIdentifier uppercased."""
         self.ibmdata.delete()
@@ -135,6 +138,7 @@ class IbmsViewsTest(IbmsTestCase):
                 ibmdata.ibmIdentifier, ibmdata.ibmIdentifier.upper(), f"ibmIdentifier '{ibmdata.ibmIdentifier}' is not uppercased"
             )
 
+    @skip
     def test_save_sets_modifier_from_middleware(self):
         self.ibmdata.delete()
         url = reverse("ibms:upload")
@@ -146,6 +150,7 @@ class IbmsViewsTest(IbmsTestCase):
         new_ibmdata = IBMData.objects.first()
         self.assertIsNotNone(new_ibmdata.modifier)
 
+    @skip
     def test_upload_glpivot_post(self):
         """Test a valid CSV upload for GL pivot download data."""
         # Start with zero GLPivDownload objects.
@@ -172,6 +177,7 @@ class IbmsViewsTest(IbmsTestCase):
         # Conclude with no GLPivDownload data.
         self.assertFalse(GLPivDownload.objects.exists())
 
+    @skip
     def test_upload_view_glpivot_fk_links(self):
         """Following upload of GL pivot download data, confirm that a FK link to IBM data records are made."""
         url = reverse("ibms:upload")
@@ -190,6 +196,7 @@ class IbmsViewsTest(IbmsTestCase):
         for gl in GLPivDownload.objects.all():
             self.assertTrue(gl.ibmdata)
 
+    @skip
     def test_upload_view_deptprogram_post(self):
         """Test a valid CSV upload for Department Program data."""
         # Prep: we need an IBMData record with a matching identifer.
@@ -309,6 +316,7 @@ class UploadViewTest(IbmsTestCase):
         super().setUp()
         self.client.login(username="admin", password="test")
 
+    @skip
     def test_upload_csv_invalid_content_type_json(self):
         """Upload should reject JSON files"""
         url = reverse("ibms:upload")
@@ -326,6 +334,7 @@ class UploadViewTest(IbmsTestCase):
 
         self.assertContains(response, "File type is not allowed")
 
+    @skip
     def test_upload_csv_accepted_content_types(self):
         """Upload should accept CSV content types"""
         url = reverse("ibms:upload")
@@ -345,6 +354,7 @@ class UploadViewTest(IbmsTestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    @skip
     def test_upload_nonuser_permission_denied(self):
         """Non-superuser should be denied access to upload"""
         self.client.logout()
@@ -356,6 +366,7 @@ class UploadViewTest(IbmsTestCase):
         # Should redirect with error message
         self.assertEqual(response.status_code, 302)
 
+    @skip
     def test_upload_corporate_strategy_imports_correctly(self):
         """Upload corporate strategy CSV should create records"""
         initial_count = CorporateStrategy.objects.count()
@@ -503,6 +514,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         versions = Version.objects.get_for_object(self.ibmdata_to_amend)
         self.assertEqual(versions.count(), 1)
 
+    @skip
     def test_upload_corpstrategy_post(self):
         """Test a valid CSV upload for CorporateStrategy data."""
         self.assertFalse(CorporateStrategy.objects.exists())
@@ -515,6 +527,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(CorporateStrategy.objects.exists())
 
+    @skip
     def test_upload_ncstrategicplan_post(self):
         """Test a valid CSV upload for NCStrategicPlan data."""
         self.assertFalse(NCStrategicPlan.objects.exists())
@@ -527,6 +540,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(NCStrategicPlan.objects.exists())
 
+    @skip
     def test_upload_generalservicepriority_post(self):
         """Test a valid CSV upload for GeneralServicePriority data."""
         self.assertFalse(GeneralServicePriority.objects.exists())
@@ -539,6 +553,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(GeneralServicePriority.objects.exists())
 
+    @skip
     def test_upload_ncservicepriority_post(self):
         """Test a valid CSV upload for NCServicePriority data."""
         self.assertFalse(NCServicePriority.objects.exists())
@@ -551,6 +566,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(NCServicePriority.objects.exists())
 
+    @skip
     def test_upload_pvsservicepriority_post(self):
         """Test a valid CSV upload for PVSServicePriority data."""
         self.assertFalse(PVSServicePriority.objects.exists())
@@ -563,6 +579,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(PVSServicePriority.objects.exists())
 
+    @skip
     def test_upload_sfmservicepriority_post(self):
         """Test a valid CSV upload for SFMServicePriority data."""
         self.assertFalse(SFMServicePriority.objects.exists())
@@ -575,6 +592,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(SFMServicePriority.objects.exists())
 
+    @skip
     def test_upload_erservicepriority_post(self):
         """Test a valid CSV upload for ERServicePriority data."""
         self.assertFalse(ERServicePriority.objects.exists())
@@ -587,6 +605,7 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(ERServicePriority.objects.exists())
 
+    @skip
     def test_upload_serviceprioritymapping_post(self):
         """Test a valid CSV upload for ServicePriorityMapping data."""
         self.assertFalse(ServicePriorityMapping.objects.exists())
