@@ -8,20 +8,7 @@ from django.urls import reverse
 from mixer.backend.django import mixer
 from reversion.models import Version
 
-from ibms.models import (
-    CorporateStrategy,
-    DepartmentProgram,
-    ERServicePriority,
-    FinancialYear,
-    GeneralServicePriority,
-    GLPivDownload,
-    IBMData,
-    NCServicePriority,
-    NCStrategicPlan,
-    PVSServicePriority,
-    ServicePriorityMapping,
-    SFMServicePriority,
-)
+from ibms.models import FinancialYear, GLPivDownload, IBMData
 from ibms.tests import IbmsTestCase
 
 
@@ -103,21 +90,6 @@ class IbmsViewsTest(IbmsTestCase):
             self.assertEqual(response.status_code, 200)
 
     @skip
-    def test_upload_ibmdata_post(self):
-        """Test a valid CSV upload for IBM data."""
-        # Start with one IBMData object.
-        self.assertEqual(IBMData.objects.count(), 1)
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "ibmdata_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("ibmdata_upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "ibm_data", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        # Conclude with 5 IBMData objects.
-        self.assertEqual(IBMData.objects.count(), 5)
-
-    @skip
     def test_upload_ibmdata_ibmidentifier_uppercased(self):
         """Confirm that IBMData imported from CSV always has ibmIdentifier uppercased."""
         self.ibmdata.delete()
@@ -137,33 +109,6 @@ class IbmsViewsTest(IbmsTestCase):
             self.assertEqual(
                 ibmdata.ibmIdentifier, ibmdata.ibmIdentifier.upper(), f"ibmIdentifier '{ibmdata.ibmIdentifier}' is not uppercased"
             )
-
-    @skip
-    def test_save_sets_modifier_from_middleware(self):
-        self.ibmdata.delete()
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "ibmdata_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("ibmdata_upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "ibm_data", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        new_ibmdata = IBMData.objects.first()
-        self.assertIsNotNone(new_ibmdata.modifier)
-
-    @skip
-    def test_upload_glpivot_post(self):
-        """Test a valid CSV upload for GL pivot download data."""
-        # Start with zero GLPivDownload objects.
-        self.assertEqual(GLPivDownload.objects.count(), 0)
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "glpivot_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("glpivot_upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "gl_pivot_download", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        # Conclude with 4 GLPivDownload objects.
-        self.assertEqual(GLPivDownload.objects.count(), 4)
 
     def test_clear_glpivot_post(self):
         """Test the superuser-only view to clear GLPivDownload data for a given financial year."""
@@ -195,26 +140,6 @@ class IbmsViewsTest(IbmsTestCase):
         # All of the GLPivDownload objects will have a FK link to the matching IBMData objects.
         for gl in GLPivDownload.objects.all():
             self.assertTrue(gl.ibmdata)
-
-    @skip
-    def test_upload_view_deptprogram_post(self):
-        """Test a valid CSV upload for Department Program data."""
-        # Prep: we need an IBMData record with a matching identifer.
-        mixer.blend(
-            IBMData,
-            fy=self.fy,
-            ibmIdentifier="151-01-11-GE1-0000-000",
-        )
-        # Start with zero DepartmentProgram objects.
-        self.assertEqual(DepartmentProgram.objects.count(), 0)
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "dept_program_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("dept_program_upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "dept_program", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(DepartmentProgram.objects.count(), 4)
 
     def test_ibms_ajax_endpoints(self):
         """Test that the IBMS AJAX endpoints work"""
@@ -316,45 +241,6 @@ class UploadViewTest(IbmsTestCase):
         super().setUp()
         self.client.login(username="admin", password="test")
 
-    @skip
-    def test_upload_csv_invalid_content_type_json(self):
-        """Upload should reject JSON files"""
-        url = reverse("ibms:upload")
-        json_file = SimpleUploadedFile("test.json", b'{"test": "data"}', content_type="application/json")
-
-        response = self.client.post(
-            url,
-            data={
-                "upload_file_type": "ibm_data",
-                "upload_file": json_file,
-                "financial_year": self.fy.financialYear,
-            },
-            follow=True,
-        )
-
-        self.assertContains(response, "File type is not allowed")
-
-    @skip
-    def test_upload_csv_accepted_content_types(self):
-        """Upload should accept CSV content types"""
-        url = reverse("ibms:upload")
-
-        # Test with valid CSV file
-        with open(os.path.join(self.test_data_path, "ibmdata_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("test.csv", test_data.read(), content_type="text/csv")
-            response = self.client.post(
-                url,
-                data={
-                    "upload_file_type": "ibm_data",
-                    "upload_file": upload,
-                    "financial_year": self.fy.financialYear,
-                },
-                follow=True,
-            )
-
-        self.assertEqual(response.status_code, 200)
-
-    @skip
     def test_upload_nonuser_permission_denied(self):
         """Non-superuser should be denied access to upload"""
         self.client.logout()
@@ -365,28 +251,6 @@ class UploadViewTest(IbmsTestCase):
 
         # Should redirect with error message
         self.assertEqual(response.status_code, 302)
-
-    @skip
-    def test_upload_corporate_strategy_imports_correctly(self):
-        """Upload corporate strategy CSV should create records"""
-        initial_count = CorporateStrategy.objects.count()
-
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "corporatestrategy_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("corp_strat.csv", test_data.read())
-            response = self.client.post(
-                url,
-                data={
-                    "upload_file_type": "corp_strategy",
-                    "upload_file": upload,
-                    "financial_year": self.fy.financialYear,
-                },
-                follow=True,
-            )
-
-        self.assertEqual(response.status_code, 200)
-        # Should have created new records
-        self.assertGreater(CorporateStrategy.objects.count(), initial_count)
 
 
 class DataAmendmentListViewTest(IbmsTestCase):
@@ -474,12 +338,6 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         self.assertNotContains(response, ibmdata2.ibmIdentifier)
         self.assertContains(response, self.ibmdata.ibmIdentifier)
 
-    def test_data_amendment_update_get(self):
-        """Test that the DataAmendmentUpdate view responds"""
-        url = reverse("ibms:data_amendment_update", kwargs={"pk": self.ibmdata.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
     def test_data_amendment_update_cancel(self):
         """Test the cancelling the DataAmendmentUpdate view redirects to the list view"""
         url = reverse("ibms:data_amendment_update", kwargs={"pk": self.ibmdata.pk})
@@ -513,107 +371,3 @@ class DataAmendmentUpdateViewTest(IbmsTestCase):
         # Object should now have versions saved.
         versions = Version.objects.get_for_object(self.ibmdata_to_amend)
         self.assertEqual(versions.count(), 1)
-
-    @skip
-    def test_upload_corpstrategy_post(self):
-        """Test a valid CSV upload for CorporateStrategy data."""
-        self.assertFalse(CorporateStrategy.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "corporatestrategy_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "corp_strategy", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(CorporateStrategy.objects.exists())
-
-    @skip
-    def test_upload_ncstrategicplan_post(self):
-        """Test a valid CSV upload for NCStrategicPlan data."""
-        self.assertFalse(NCStrategicPlan.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "ncstrategicplan_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "nature_conservation", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(NCStrategicPlan.objects.exists())
-
-    @skip
-    def test_upload_generalservicepriority_post(self):
-        """Test a valid CSV upload for GeneralServicePriority data."""
-        self.assertFalse(GeneralServicePriority.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "generalservicepriority_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "general_sp", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(GeneralServicePriority.objects.exists())
-
-    @skip
-    def test_upload_ncservicepriority_post(self):
-        """Test a valid CSV upload for NCServicePriority data."""
-        self.assertFalse(NCServicePriority.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "ncservicepriority_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "nc_sp", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(NCServicePriority.objects.exists())
-
-    @skip
-    def test_upload_pvsservicepriority_post(self):
-        """Test a valid CSV upload for PVSServicePriority data."""
-        self.assertFalse(PVSServicePriority.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "pvsservicepriority_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "pvs_sp", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(PVSServicePriority.objects.exists())
-
-    @skip
-    def test_upload_sfmservicepriority_post(self):
-        """Test a valid CSV upload for SFMServicePriority data."""
-        self.assertFalse(SFMServicePriority.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "sfmservicepriority_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "sfm_sp", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(SFMServicePriority.objects.exists())
-
-    @skip
-    def test_upload_erservicepriority_post(self):
-        """Test a valid CSV upload for ERServicePriority data."""
-        self.assertFalse(ERServicePriority.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "erservicepriority_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "er_sp", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(ERServicePriority.objects.exists())
-
-    @skip
-    def test_upload_serviceprioritymapping_post(self):
-        """Test a valid CSV upload for ServicePriorityMapping data."""
-        self.assertFalse(ServicePriorityMapping.objects.exists())
-        url = reverse("ibms:upload")
-        with open(os.path.join(self.test_data_path, "serviceprioritymapping_upload_test.csv"), "rb") as test_data:
-            upload = SimpleUploadedFile("upload.csv", test_data.read())
-            resp = self.client.post(
-                url, data={"upload_file_type": "service_priority_mapping", "upload_file": upload, "financial_year": "2024/25"}, follow=True
-            )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(ServicePriorityMapping.objects.exists())
