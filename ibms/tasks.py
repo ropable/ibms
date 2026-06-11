@@ -12,6 +12,7 @@ from ibms.models import (
     CorporateStrategy,
     DepartmentProgram,
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -22,7 +23,6 @@ from ibms.models import (
     SFMServicePriority,
 )
 from ibms.utils import ibms_import_from_csv
-from sfm.models import FinancialYear
 
 LOGGER = logging.getLogger("ibms")
 
