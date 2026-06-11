@@ -4,7 +4,7 @@ import io
 import os
 from contextlib import contextmanager
 from datetime import date, datetime
-from typing import Literal, Optional, Sequence
+from typing import Literal, Optional, Sequence, Tuple
 
 from azure.storage.blob import BlobClient
 from django.conf import settings
@@ -15,6 +15,7 @@ from ibms.models import (
     CorporateStrategy,
     DepartmentProgram,
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -24,7 +25,6 @@ from ibms.models import (
     ServicePriorityMapping,
     SFMServicePriority,
 )
-from sfm.models import FinancialYear
 
 
 class IBMSValidationError(Exception):
@@ -45,7 +45,7 @@ class ColumnCountError(IBMSValidationError):
     pass
 
 
-def get_download_period():
+def get_download_period() -> date:
     """Return the 'newest' download_period date value for all the GLPivDownload objects."""
     if not GLPivDownload.objects.exists():
         return date.today()
@@ -127,7 +127,7 @@ def ibms_import_from_csv(
         | ServicePriorityMapping
     ],
     user=Optional[User],
-) -> [str, int]:
+) -> Tuple:
     """Generic utility function to take a CSV source (file path or Azure BlobClient),
     a FinancialYear object and an IBMS model, and import that data (update existing or create new records).
     Data validation is carried out during the import.
