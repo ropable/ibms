@@ -126,7 +126,7 @@ def ibms_import_from_csv(
         | ERServicePriority
         | ServicePriorityMapping
     ],
-    user=Optional[User],
+    user: Optional[User] = None,
 ) -> Tuple:
     """Generic utility function to take a CSV source (file path or Azure BlobClient),
     a FinancialYear object and an IBMS model, and import that data (update existing or create new records).
