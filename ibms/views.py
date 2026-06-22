@@ -15,7 +15,7 @@ from django.utils.http import urlencode
 from django.views.generic import CreateView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import BaseDetailView
 from django.views.generic.edit import FormMixin, FormView
-from reversion import set_comment
+from reversion import create_revision, set_comment, set_user
 from reversion.views import RevisionMixin
 from xlrd import open_workbook
 from xlutils.copy import copy as copy_xl
@@ -706,26 +706,32 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         return self.render_to_response(context)
 
     def form_valid(self, form):
-        # Override a couple of form field values on save.
-        new_ibmdata = form.save(commit=False)
+        with create_revision():
+            # Override a couple of form field values on save.
+            new_ibmdata = form.save(commit=False)
+            new_ibmdata.modifier = self.request.user
 
-        # Uppercase the activity, project and job fields.
-        new_ibmdata.activity = new_ibmdata.activity.upper()
-        new_ibmdata.project = new_ibmdata.project.upper()
-        new_ibmdata.job = new_ibmdata.job.upper()
-        # Cast the account and service fields as string and left-pad them with zeroes.
-        new_ibmdata.account = str(new_ibmdata.account).zfill(2)
-        new_ibmdata.service = str(new_ibmdata.service).zfill(2)
-        # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
-        new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
+            # Uppercase the activity, project and job fields.
+            new_ibmdata.activity = new_ibmdata.activity.upper()
+            new_ibmdata.project = new_ibmdata.project.upper()
+            new_ibmdata.job = new_ibmdata.job.upper()
+            # Cast the account and service fields as string and left-pad them with zeroes.
+            new_ibmdata.account = str(new_ibmdata.account).zfill(2)
+            new_ibmdata.service = str(new_ibmdata.service).zfill(2)
+            # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
+            new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
 
-        # Short-circuit: if a matching IBMData record exists, return to that object view instead.
-        if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
-            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
-            messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
-            return redirect(existing_ibmdata.get_absolute_url())
+            # Short-circuit: if a matching IBMData record exists, return to that object view instead.
+            if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
+                existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
+                messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
+                return redirect(existing_ibmdata.get_absolute_url())
 
-        new_ibmdata.save()
+            # Set revision metadata.
+            set_user(self.request.user)
+            set_comment("Initial version created via code update form")
+            new_ibmdata.save()
+
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
         # Find any matching GLPivDownload records and set the FK link.

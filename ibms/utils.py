@@ -210,10 +210,10 @@ def ibms_import_from_csv(
                         ibmdata.marineKPI = row[14]
                         ibmdata.regionProject = row[15]
                         ibmdata.regionDescription = row[16]
-                        ibmdata.save()
                         set_comment(f"{ibmdata} amended via upload")
                         if user:
                             set_user(user)
+                            ibmdata.modifier = user
                     else:
                         data = {
                             "fy": fy,
@@ -236,14 +236,17 @@ def ibms_import_from_csv(
                             "regionDescription": str(row[16]),
                         }
                         ibmdata = IBMData(**data)
-                        ibmdata.save()
                         set_comment(f"{ibmdata} created via upload")
                         if user:
                             set_user(user)
-                        # Repeat the save, in order to try setting the service priority on the object.
-                        # We can't set this before having a PK on the object.
-                        if not ibmdata.service_priority:
-                            ibmdata.save()
+                            ibmdata.modifier = user
+                    ibmdata.save()
+
+                    # Repeat the save, in order to try setting the service priority on the object.
+                    # We can't set this before having a PK on the object, hence the conditional second save.
+                    if not ibmdata.service_priority:
+                        ibmdata.save()
+
                 # Update any existing GLPivDownload objects that should now link to this object.
                 for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
                     glpiv.save()
