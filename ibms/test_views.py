@@ -1,6 +1,5 @@
 import os
 from datetime import date
-from unittest import skip
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.client import Client
@@ -89,7 +88,6 @@ class IbmsViewsTest(IbmsTestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
 
-    @skip
     def test_upload_ibmdata_ibmidentifier_uppercased(self):
         """Confirm that IBMData imported from CSV always has ibmIdentifier uppercased."""
         self.ibmdata.delete()
@@ -122,7 +120,6 @@ class IbmsViewsTest(IbmsTestCase):
         # Conclude with no GLPivDownload data.
         self.assertFalse(GLPivDownload.objects.exists())
 
-    @skip
     def test_upload_view_glpivot_fk_links(self):
         """Following upload of GL pivot download data, confirm that a FK link to IBM data records are made."""
         url = reverse("ibms:upload")
@@ -282,6 +279,43 @@ class DataAmendmentListViewTest(IbmsTestCase):
         response = self.client.get(url, {"cost_centre": ibmdata.costCentre})
         # Should contain IBMData records
         self.assertContains(response, ibmdata.ibmIdentifier)
+
+
+class CodeUpdateCreateViewTest(IbmsTestCase):
+    """Tests for CodeUpdateCreateView creating IBMData records."""
+
+    client = Client()
+
+    def setUp(self):
+        super().setUp()
+        mixer.blend(GLPivDownload, fy=self.fy, costCentre="999")
+
+    def test_code_update_create_sets_modifier_and_creates_revision(self):
+        """CodeUpdateCreateView should set the modifier and create an initial revision on successful creation."""
+        url = reverse("ibms:code_update")
+        response = self.client.post(
+            url,
+            data={
+                "fy": self.fy.financialYear,
+                "costCentre": "999",
+                "account": 1,
+                "service": "12",
+                "activity": "AB1",
+                "project": "AAAA",
+                "job": "ABC",
+                "budgetArea": "Operations",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        ibmdata = IBMData.objects.filter(modifier=self.user).get()
+        self.assertEqual(ibmdata.modifier, self.user)
+
+        versions = Version.objects.get_for_object(ibmdata)
+        self.assertEqual(versions.count(), 1)
+        version = versions.get()
+        self.assertEqual(version.revision.comment, f"{ibmdata} created via code update form")
+        self.assertEqual(version.revision.user, self.user)
 
 
 class DataAmendmentUpdateViewTest(IbmsTestCase):

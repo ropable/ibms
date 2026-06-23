@@ -660,6 +660,7 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
 
     def form_valid(self, form):
         obj = self.get_object()
+        obj.modifier = self.request.user
         messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
         set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
         # Find any matching GLPivDownload records and set the FK link.
@@ -729,8 +730,9 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
 
             # Set revision metadata.
             set_user(self.request.user)
-            set_comment("Initial version created via code update form")
+            set_comment(f"{new_ibmdata} created via code update form")
             new_ibmdata.save()
+            self.object = new_ibmdata
 
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
@@ -738,4 +740,4 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier, ibmdata__isnull=True):
             glpiv.save()
 
-        return super().form_valid(form)
+        return redirect(self.object.get_absolute_url())
