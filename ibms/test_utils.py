@@ -1,20 +1,39 @@
+import os
+import tempfile
+from contextlib import contextmanager
 from datetime import date, datetime
-from io import StringIO
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from mixer.backend.django import mixer
 
-from ibms.models import GLPivDownload, IBMData
+from ibms.models import (
+    CorporateStrategy,
+    DepartmentProgram,
+    ERServicePriority,
+    GeneralServicePriority,
+    GLPivDownload,
+    IBMData,
+    NCServicePriority,
+    NCStrategicPlan,
+    PVSServicePriority,
+    ServicePriorityMapping,
+    SFMServicePriority,
+)
 from ibms.tests import IbmsTestCase
 from ibms.utils import (
+    ColumnCountError,
     FieldLengthError,
     IBMSValidationError,
     get_download_period,
+    ibms_import_from_csv,
     validate_char_field,
-    validate_headers,
+    validate_column_count,
     validate_integer_field,
-    validate_upload_file,
 )
+
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 
 
 class GetDownloadPeriodTest(IbmsTestCase):
@@ -122,95 +141,6 @@ class ValidateIntegerFieldTest(TestCase):
         self.assertEqual(result, -42)
 
 
-class ValidateHeadersTest(IbmsTestCase):
-    """Test validate_headers utility function."""
-
-    def test_validate_headers_correct_count_exact(self):
-        """validate_headers should accept correct header count"""
-        headers = ["col1", "col2", "col3"]
-        result = validate_headers(headers, valid_count=3, headings=headers)
-        self.assertTrue(result)
-
-    def test_validate_headers_correct_headings(self):
-        """validate_headers should accept correct heading names"""
-        headers = ["Download Period", "CC", "Account"]
-        headings = ["Download Period", "CC", "Account"]
-        result = validate_headers(headers, valid_count=3, headings=headings)
-        self.assertTrue(result)
-
-    def test_validate_headers_case_insensitive(self):
-        """validate_headers should be case-insensitive"""
-        headers = ["download period", "cc", "account"]
-        headings = ["Download Period", "CC", "Account"]
-        # The actual function might be case-sensitive, but this tests the behavior
-        try:
-            result = validate_headers(headers, valid_count=3, headings=headings)
-            self.assertTrue(result)
-        except IBMSValidationError:
-            # If case-sensitive, that's also valid behavior to test
-            pass
-
-    def test_validate_headers_wrong_count(self):
-        """validate_headers should reject wrong header count"""
-        header_row = ["col1", "col2"]
-        headings = ["col1", "col2", "col3"]
-        with self.assertRaises(IBMSValidationError):
-            validate_headers(header_row, valid_count=3, headings=headings)
-
-    def test_validate_headers_wrong_headings(self):
-        """validate_headers should reject wrong heading names"""
-        header_row = ["WrongCol1", "WrongCol2", "WrongCol3"]
-        headings = ["col1", "col2", "col3"]
-        with self.assertRaises(IBMSValidationError) as context:
-            validate_headers(header_row, valid_count=3, headings=headings)
-
-        self.assertIn("The column headings in the CSV file do not match the required headings", str(context.exception))
-
-
-class ValidateUploadFileTest(IbmsTestCase):
-    """Test validate_upload_file utility function."""
-
-    def test_validate_upload_file_glpivot_valid(self):
-        """validate_upload_file should accept valid GL Pivot header"""
-        csv_data = "Download Period,CC,Account,Service,Activity,Resource,Project,Job,Shortcode,Shortcode_Name,GL_Code,PTD_Actual,PTD_Budget,YTD_Actual,YTD_Budget,FY_Budget,YTD_Variance,CC_Name,Service Name,Activity_Name,Resource_Name,Project_Name,Job_Name,Code identifier,ResNmNo,ActNmNo,ProjNmNo,Region/Branch,Division,Resource Category,Wildfire,Exp_Rev,Fire Activities,MPRA Category"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "gl_pivot_download")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_ibmdata_valid(self):
-        """validate_upload_file should accept valid IBM Data header"""
-        csv_data = "ibmIdentifier,costCentre,account,service,activity,project,job,budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "ibm_data")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_corporate_strategy_valid(self):
-        """validate_upload_file should accept valid Corporate Strategy header"""
-        csv_data = "IBMSCSNo,IBMSCSDesc1,IBMSCSDesc2"
-        reader = StringIO(csv_data)
-
-        result = validate_upload_file(reader, "corp_strategy")
-        self.assertTrue(result)
-
-    def test_validate_upload_file_invalid_type(self):
-        """validate_upload_file should raise error for invalid file type"""
-        csv_data = "col1,col2,col3"
-        reader = StringIO(csv_data)
-
-        with self.assertRaises(IBMSValidationError):
-            validate_upload_file(reader, "invalid_type")
-
-    def test_validate_upload_file_missing_columns(self):
-        """validate_upload_file should reject file with missing columns"""
-        csv_data = "WrongCol1,WrongCol2,WrongCol3"
-        reader = StringIO(csv_data)
-
-        with self.assertRaises(IBMSValidationError):
-            validate_upload_file(reader, "ibm_data")
-
-
 class CSVRowBoundsCheckingTest(IbmsTestCase):
     """Tests for CSV row bounds checking - security-focused."""
 
@@ -266,3 +196,430 @@ class GLPivDownloadDisplayMethodsTest(IbmsTestCase):
         """GLPivDownload job should be zero-padded to 3 digits"""
         gl = mixer.blend(GLPivDownload, fy=self.fy, job="5")
         self.assertEqual(gl.get_job_display(), "005")
+
+
+class ValidateColumnCountTest(TestCase):
+    """Test validate_column_count function."""
+
+    def test_exact_match(self):
+        """validate_column_count should return True for exact match"""
+        result = validate_column_count(["a", "b", "c"], 3)
+        self.assertTrue(result)
+
+    def test_too_few_columns(self):
+        """validate_column_count should raise ColumnCountError when row is too short"""
+        with self.assertRaises(ColumnCountError) as ctx:
+            validate_column_count(["a", "b"], 3)
+        self.assertIn("expected 3", str(ctx.exception))
+        self.assertIn("received 2", str(ctx.exception))
+
+    def test_too_many_columns(self):
+        """validate_column_count should raise ColumnCountError when row is too long"""
+        with self.assertRaises(ColumnCountError) as ctx:
+            validate_column_count(["a", "b", "c", "d"], 3)
+        self.assertIn("expected 3", str(ctx.exception))
+        self.assertIn("received 4", str(ctx.exception))
+
+    def test_empty_row(self):
+        """validate_column_count should raise ColumnCountError for empty row when count > 0"""
+        with self.assertRaises(ColumnCountError):
+            validate_column_count([], 1)
+
+
+class IbmsImportFromCsvGLPivDownloadTest(IbmsTestCase):
+    """Test ibms_import_from_csv for GLPivDownload using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "glpivot_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing glpivot CSV should create GLPivDownload records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, GLPivDownload)
+        self.assertEqual(desc, "GL Pivot Download")
+        self.assertEqual(count, 4)
+        self.assertEqual(GLPivDownload.objects.filter(fy=self.fy).count(), 4)
+
+    def test_import_sets_correct_fields(self):
+        """Imported GLPivDownload should have expected field values from first CSV row"""
+        ibms_import_from_csv(self.csv_path, self.fy, GLPivDownload)
+        # First row: costCentre=151, account=1, service=32, download_period=30/04/2025
+        gl = GLPivDownload.objects.filter(fy=self.fy, costCentre="151", account=1, service=32).first()
+        self.assertIsNotNone(gl)
+        self.assertEqual(gl.download_period.strftime("%d/%m/%Y"), "30/04/2025")
+        self.assertEqual(gl.division, "Nature Based Tourism")
+
+    def test_import_links_ibmdata_when_present(self):
+        """GLPivDownload import should set ibmdata FK when a matching IBMData record exists"""
+        # Create an IBMData record matching the codeID in the CSV: 418-01-12-GC2-GAS1-945
+        mixer.blend(IBMData, fy=self.fy, ibmIdentifier="418-01-12-GC2-GAS1-945")
+        ibms_import_from_csv(self.csv_path, self.fy, GLPivDownload)
+        gl = GLPivDownload.objects.filter(fy=self.fy, codeID="418-01-12-GC2-GAS1-945").first()
+        self.assertIsNotNone(gl)
+        self.assertIsNotNone(gl.ibmdata)
+        self.assertEqual(gl.ibmdata.ibmIdentifier, "418-01-12-GC2-GAS1-945")
+
+    def test_import_invalid_date_raises_error(self):
+        """A row with an unparseable downloadPeriod should raise IBMSValidationError"""
+        bad_csv = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
+        bad_csv.write("Download Period,CC,Account,Service,Activity,Resource,Project,Job,"
+                      "Shortcode,Shortcode_Name,GL_Code,PTD_Actual,PTD_Budget,YTD_Actual,"
+                      "YTD_Budget,FY_Budget,YTD_Variance,CC_Name,Service Name,Activity_Name,"
+                      "Resource_Name,Project_Name,Job_Name,Code identifier,ResNmNo,ActNmNo,"
+                      "ProjNmNo,Region/Branch,Division,Resource Category,Wildfire,Exp_Rev,"
+                      "Fire Activities,MPRA Category\n")
+        bad_csv.write("2025-04-30,151,1,32,GG3,1371,0,105,,,"
+                      "151-01-32-GG3-1371-0000-105,1844.04,0,33981.8,0,0,33981.8,"
+                      "Nature Based Tourism,Parks & Visitor services,Lease Management,"
+                      "Payroll Overheads,None,TERRITORIAL LEASES,418-01-12-GC2-GAS1-945,"
+                      "1371-Payroll Overheads,GG3-Lease Management,0-None,"
+                      "Nature Based Tourism,Nature Based Tourism,Payroll,,Expense,"
+                      "Normal Activities,\n")
+        bad_csv.close()
+        try:
+            with self.assertRaises(IBMSValidationError) as ctx:
+                ibms_import_from_csv(bad_csv.name, self.fy, GLPivDownload)
+            self.assertIn("Unable to parse downloadPeriod", str(ctx.exception))
+        finally:
+            Path(bad_csv.name).unlink()
+
+    def test_import_wrong_column_count_raises_error(self):
+        """A row with too few columns should raise ColumnCountError"""
+        bad_csv = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
+        bad_csv.write("col1,col2,col3\n")  # header
+        bad_csv.write("30/04/2025,151,32\n")  # only 3 columns
+        bad_csv.close()
+        try:
+            with self.assertRaises(ColumnCountError):
+                ibms_import_from_csv(bad_csv.name, self.fy, GLPivDownload)
+        finally:
+            Path(bad_csv.name).unlink()
+
+
+class IbmsImportFromCsvIBMDataTest(IbmsTestCase):
+    """Test ibms_import_from_csv for IBMData using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "ibmdata_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing ibmdata CSV should create IBMData records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, IBMData, user=self.user)
+        self.assertEqual(desc, "IBM Data")
+        self.assertEqual(count, 4)
+        self.assertEqual(IBMData.objects.filter(fy=self.fy).count(), 5)  # 4 new + 1 from setUp
+
+    def test_import_sets_correct_fields(self):
+        """Imported IBMData should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, IBMData)
+        ibm = IBMData.objects.get(fy=self.fy, ibmIdentifier="418-01-12-GC2-GAS1-945")
+        self.assertEqual(ibm.costCentre, "418")
+        self.assertEqual(ibm.account, 1)
+        self.assertEqual(ibm.service, 12)
+        self.assertEqual(ibm.budgetArea, "Yamatji Nation")
+        self.assertEqual(ibm.projectSponsor, "Operations Officer")
+
+    def test_import_identifier_stored_uppercase(self):
+        """IBMData ibmIdentifier should be stored uppercase even if CSV contains lowercase"""
+        # Create a temporary CSV with a lowercase identifier version
+        bad_csv = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
+        bad_csv.write("ibmIdentifier,costCentre,account,service,activity,project,job,"
+                      "budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,"
+                      "annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription\n")
+        bad_csv.write("lowercase-abc-001,418,1,12,GC2,GAS1,945,Budget,Sponsor,,SP001,,,,,,\n")
+        bad_csv.close()
+        try:
+            ibms_import_from_csv(bad_csv.name, self.fy, IBMData)
+            ibm = IBMData.objects.get(fy=self.fy, ibmIdentifier="LOWERCASE-ABC-001")
+            self.assertEqual(ibm.ibmIdentifier, "LOWERCASE-ABC-001")
+        finally:
+            Path(bad_csv.name).unlink()
+
+    def test_import_updates_existing_record(self):
+        """Importing an ibmIdentifier that already exists should update, not duplicate"""
+        # Pre-create with different budgetArea
+        mixer.blend(IBMData, fy=self.fy, ibmIdentifier="418-01-12-GC2-GAS1-945", budgetArea="Old")
+        ibms_import_from_csv(self.csv_path, self.fy, IBMData)
+        # Should still be exactly 1 record with this identifier
+        self.assertEqual(IBMData.objects.filter(fy=self.fy, ibmIdentifier="418-01-12-GC2-GAS1-945").count(), 1)
+        ibm = IBMData.objects.get(fy=self.fy, ibmIdentifier="418-01-12-GC2-GAS1-945")
+        self.assertEqual(ibm.budgetArea, "Yamatji Nation")
+
+    def test_import_no_user_still_succeeds(self):
+        """Importing without a user argument should succeed"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, IBMData, user=None)
+        self.assertEqual(count, 4)
+
+    def test_import_invalid_account_raises_error(self):
+        """A non-integer account value should raise IBMSValidationError"""
+        bad_csv = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
+        bad_csv.write("ibmIdentifier,costCentre,account,service,activity,project,job,"
+                      "budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,"
+                      "annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription\n")
+        bad_csv.write("IBM-BAD,418,NOT_AN_INT,12,GC2,GAS1,945,Budget,Sponsor,,SP001,,,,,,\n")
+        bad_csv.close()
+        try:
+            with self.assertRaises(IBMSValidationError) as ctx:
+                ibms_import_from_csv(bad_csv.name, self.fy, IBMData)
+            self.assertIn("must be an integer", str(ctx.exception))
+        finally:
+            Path(bad_csv.name).unlink()
+
+    def test_import_field_over_max_length_raises_error(self):
+        """An ibmIdentifier exceeding 50 chars should raise FieldLengthError"""
+        bad_csv = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
+        bad_csv.write("ibmIdentifier,costCentre,account,service,activity,project,job,"
+                      "budgetArea,projectSponsor,regionalSpecificInfo,servicePriorityID,"
+                      "annualWPInfo,priorityActionNo,priorityLevel,marineKPI,regionProject,regionDescription\n")
+        bad_csv.write("A" * 51 + ",418,1,12,GC2,GAS1,945,Budget,Sponsor,,SP001,,,,,,\n")
+        bad_csv.close()
+        try:
+            with self.assertRaises(FieldLengthError):
+                ibms_import_from_csv(bad_csv.name, self.fy, IBMData)
+        finally:
+            Path(bad_csv.name).unlink()
+
+
+class IbmsImportFromCsvCorporateStrategyTest(IbmsTestCase):
+    """Test ibms_import_from_csv for CorporateStrategy using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "corporatestrategy_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing corporatestrategy CSV should create CorporateStrategy records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, CorporateStrategy)
+        self.assertEqual(count, 2)
+        self.assertEqual(CorporateStrategy.objects.filter(fy=self.fy).count(), 2)
+
+    def test_import_sets_correct_fields(self):
+        """Imported CorporateStrategy should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, CorporateStrategy)
+        cs = CorporateStrategy.objects.get(fy=self.fy, corporateStrategyNo="S01")
+        self.assertEqual(cs.description1, "Expand the terrestrial conservation reserve system")
+
+    def test_import_updates_existing_record(self):
+        """Re-importing should update an existing CorporateStrategy"""
+        mixer.blend(CorporateStrategy, fy=self.fy, corporateStrategyNo="S01", description1="Old")
+        ibms_import_from_csv(self.csv_path, self.fy, CorporateStrategy)
+        self.assertEqual(CorporateStrategy.objects.filter(fy=self.fy, corporateStrategyNo="S01").count(), 1)
+        cs = CorporateStrategy.objects.get(fy=self.fy, corporateStrategyNo="S01")
+        self.assertEqual(cs.description1, "Expand the terrestrial conservation reserve system")
+
+
+class IbmsImportFromCsvNCStrategicPlanTest(IbmsTestCase):
+    """Test ibms_import_from_csv for NCStrategicPlan using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "ncstrategicplan_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing ncstrategicplan CSV should create NCStrategicPlan records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, NCStrategicPlan)
+        self.assertEqual(desc, "Nature Conservation")
+        self.assertEqual(count, 2)
+        self.assertEqual(NCStrategicPlan.objects.filter(fy=self.fy).count(), 2)
+
+    def test_import_sets_correct_fields(self):
+        """Imported NCStrategicPlan should have correct direction field"""
+        ibms_import_from_csv(self.csv_path, self.fy, NCStrategicPlan)
+        sp = NCStrategicPlan.objects.get(fy=self.fy, strategicPlanNo="SP01")
+        self.assertEqual(sp.direction, "Value 1")
+        self.assertEqual(sp.directionNo, "D01")
+
+
+class IbmsImportFromCsvDepartmentProgramTest(IbmsTestCase):
+    """Test ibms_import_from_csv for DepartmentProgram using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "dept_program_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing dept_program CSV should create DepartmentProgram records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, DepartmentProgram)
+        self.assertEqual(count, 4)
+        self.assertEqual(DepartmentProgram.objects.filter(fy=self.fy).count(), 4)
+
+    def test_import_sets_correct_fields(self):
+        """Imported DepartmentProgram should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, DepartmentProgram)
+        dp = DepartmentProgram.objects.get(fy=self.fy, ibmIdentifier="151-01-11-GE1-0000-000")
+        self.assertEqual(dp.dept_program1, "Nature-based tourism")
+
+    def test_import_links_glpivdownload_when_present(self):
+        """DepartmentProgram import should link existing unlinked GLPivDownload records"""
+        # Create a GLPivDownload with matching codeID but no department_program FK
+        gl = mixer.blend(GLPivDownload, fy=self.fy, codeID="151-01-11-GE1-0000-000", department_program=None)
+        ibms_import_from_csv(self.csv_path, self.fy, DepartmentProgram)
+        gl.refresh_from_db()
+        self.assertIsNotNone(gl.department_program)
+        self.assertEqual(gl.department_program.ibmIdentifier, "151-01-11-GE1-0000-000")
+
+
+class IbmsImportFromCsvGeneralServicePriorityTest(IbmsTestCase):
+    """Test ibms_import_from_csv for GeneralServicePriority using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "generalservicepriority_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing generalservicepriority CSV should create GeneralServicePriority records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, GeneralServicePriority)
+        self.assertEqual(count, 2)
+        self.assertEqual(GeneralServicePriority.objects.filter(fy=self.fy).count(), 2)
+
+    def test_import_sets_correct_fields(self):
+        """Imported GeneralServicePriority should have correct categoryID"""
+        ibms_import_from_csv(self.csv_path, self.fy, GeneralServicePriority)
+        gsp = GeneralServicePriority.objects.get(fy=self.fy, servicePriorityNo="General 01")
+        self.assertEqual(gsp.categoryID, "General-All")
+        self.assertEqual(gsp.description, "Organisational Support - Mgt & Ops Sup ")
+
+
+class IbmsImportFromCsvNCServicePriorityTest(IbmsTestCase):
+    """Test ibms_import_from_csv for NCServicePriority using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "ncservicepriority_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing ncservicepriority CSV should create NCServicePriority records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, NCServicePriority)
+        self.assertEqual(desc, "Nature Conservation Service Priority")
+        self.assertEqual(count, 2)
+        self.assertEqual(NCServicePriority.objects.filter(fy=self.fy).count(), 2)
+
+    def test_import_sets_correct_fields(self):
+        """Imported NCServicePriority should have correct categoryID"""
+        ibms_import_from_csv(self.csv_path, self.fy, NCServicePriority)
+        nsp = NCServicePriority.objects.get(fy=self.fy, servicePriorityNo="BC-X-X")
+        self.assertEqual(nsp.categoryID, "BC-All")
+
+
+class IbmsImportFromCsvPVSServicePriorityTest(IbmsTestCase):
+    """Test ibms_import_from_csv for PVSServicePriority using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "pvsservicepriority_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing pvsservicepriority CSV should create PVSServicePriority records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, PVSServicePriority)
+        self.assertEqual(desc, "Parks & Visitor Services Service Priority")
+        self.assertEqual(count, 1)
+        self.assertEqual(PVSServicePriority.objects.filter(fy=self.fy).count(), 1)
+
+    def test_import_sets_correct_fields(self):
+        """Imported PVSServicePriority should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, PVSServicePriority)
+        pvs = PVSServicePriority.objects.get(fy=self.fy, servicePriorityNo="General 02")
+        self.assertEqual(pvs.categoryID, "PM-All")
+
+
+class IbmsImportFromCsvSFMServicePriorityTest(IbmsTestCase):
+    """Test ibms_import_from_csv for SFMServicePriority using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "sfmservicepriority_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing sfmservicepriority CSV should create SFMServicePriority records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, SFMServicePriority)
+        self.assertEqual(desc, "Forest Management Service Priority")
+        self.assertEqual(count, 2)
+        self.assertEqual(SFMServicePriority.objects.filter(fy=self.fy).count(), 2)
+
+    def test_import_sets_correct_fields(self):
+        """Imported SFMServicePriority should have correct regionBranch"""
+        ibms_import_from_csv(self.csv_path, self.fy, SFMServicePriority)
+        sfm = SFMServicePriority.objects.get(fy=self.fy, servicePriorityNo="FM-01")
+        self.assertEqual(sfm.categoryID, "FM-All")
+        self.assertEqual(sfm.regionBranch, "Region")
+
+
+class IbmsImportFromCsvERServicePriorityTest(IbmsTestCase):
+    """Test ibms_import_from_csv for ERServicePriority using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "erservicepriority_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing erservicepriority CSV should create ERServicePriority records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, ERServicePriority)
+        self.assertEqual(desc, "Fire Services Service Priority")
+        self.assertEqual(count, 1)
+        self.assertEqual(ERServicePriority.objects.filter(fy=self.fy).count(), 1)
+
+    def test_import_sets_correct_fields(self):
+        """Imported ERServicePriority should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, ERServicePriority)
+        er = ERServicePriority.objects.get(fy=self.fy, servicePriorityNo="Fire-01")
+        self.assertEqual(er.categoryID, "Fire")
+        self.assertEqual(er.classification, "Bushfire Suppression (CoA Activitiy DJ0)")
+
+
+class IbmsImportFromCsvServicePriorityMappingTest(IbmsTestCase):
+    """Test ibms_import_from_csv for ServicePriorityMapping using real test CSV data."""
+
+    def setUp(self):
+        super().setUp()
+        self.csv_path = os.path.join(TEST_DATA_DIR, "serviceprioritymapping_upload_test.csv")
+
+    def test_import_creates_records(self):
+        """Importing serviceprioritymapping CSV should create ServicePriorityMapping records"""
+        desc, count = ibms_import_from_csv(self.csv_path, self.fy, ServicePriorityMapping)
+        self.assertEqual(desc, "Service Priority Mapping")
+        self.assertEqual(count, 4)
+        self.assertEqual(ServicePriorityMapping.objects.filter(fy=self.fy).count(), 4)
+
+    def test_import_sets_correct_fields(self):
+        """Imported ServicePriorityMapping should have correct field values"""
+        ibms_import_from_csv(self.csv_path, self.fy, ServicePriorityMapping)
+        spm = ServicePriorityMapping.objects.get(fy=self.fy, costCentreNo="811")
+        self.assertEqual(spm.wildlifeManagement, "BC-All")
+        self.assertEqual(spm.parksManagement, "PM-All")
+        self.assertEqual(spm.forestManagement, "FM-All")
+
+    def test_import_handles_empty_forest_management(self):
+        """ServicePriorityMapping import should handle empty optional fields"""
+        ibms_import_from_csv(self.csv_path, self.fy, ServicePriorityMapping)
+        spm = ServicePriorityMapping.objects.get(fy=self.fy, costCentreNo="151")
+        self.assertEqual(spm.forestManagement, "")
+
+
+class IbmsImportFromCsvBlobClientTest(IbmsTestCase):
+    """Test ibms_import_from_csv routes to blobload_context when given a BlobClient."""
+
+    @patch("ibms.utils.blobload_context")
+    def test_blob_client_uses_blobload_context(self, mock_blobload):
+        """Passing a BlobClient source should use blobload_context, not csvload_context"""
+        import csv
+        import io
+        from azure.storage.blob import BlobClient
+
+        rows = [
+            ["418-01-12-GC2-GAS1-945", "418", "1", "12", "GC2", "GAS1", "945",
+             "Yamatji Nation", "Ops Officer", "", "General 01", "", "", "", "", "", ""]
+        ]
+        buf = io.StringIO()
+        csv.writer(buf).writerows(rows)
+        buf.seek(0)
+        mock_blobload.return_value.__enter__.return_value = csv.reader(buf)
+        mock_blobload.return_value.__exit__.return_value = None
+
+        # Set __class__ so that isinstance(mock_blob, BlobClient) returns True
+        mock_blob = MagicMock()
+        mock_blob.__class__ = BlobClient
+        desc, count = ibms_import_from_csv(mock_blob, self.fy, IBMData)
+
+        mock_blobload.assert_called_once_with(mock_blob)
+        self.assertEqual(count, 1)

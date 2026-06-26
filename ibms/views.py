@@ -1,8 +1,6 @@
 import json
 import logging
 import os
-import tempfile
-from io import StringIO
 
 from azure.storage.blob import BlobServiceClient
 from django.conf import settings
@@ -17,7 +15,7 @@ from django.utils.http import urlencode
 from django.views.generic import CreateView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import BaseDetailView
 from django.views.generic.edit import FormMixin, FormView
-from reversion import set_comment
+from reversion import create_revision, set_comment, set_user
 from reversion.views import RevisionMixin
 from xlrd import open_workbook
 from xlutils.copy import copy as copy_xl
@@ -34,7 +32,7 @@ from ibms.forms import (
 from ibms.models import FinancialYear, GLPivDownload, IBMData, NCServicePriority, PVSServicePriority, SFMServicePriority
 from ibms.reports import code_update_report, download_report
 from ibms.tasks import process_uploaded_csv
-from ibms.utils import get_download_period, process_upload_file, validate_upload_file
+from ibms.utils import get_download_period
 
 LOGGER = logging.getLogger("ibms")
 
@@ -106,8 +104,12 @@ class ClearGLPivotView(IbmsFormView):
         return super().form_valid(form)
 
 
-class UploadView(RevisionMixin, IbmsFormView):
-    """Upload view for superusers only."""
+class UploadView(IbmsFormView):
+    """Superuser-only view: function to stream the uploaded CSV directly to Azure Blob Storage
+    instead of processing it locally. Requires the AZURE_STORAGE_CONNECTION_STRING
+    environment variable to be set. AZURE_STORAGE_CONTAINER_NAME must also be
+    defined in settings.
+    """
 
     form_class = UploadForm
 
@@ -129,38 +131,30 @@ class UploadView(RevisionMixin, IbmsFormView):
     def form_valid(self, form):
         fy = form.cleaned_data["financial_year"]
         file_type = form.cleaned_data["upload_file_type"]
+        upload_file = form.cleaned_data["upload_file"]
+        connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        if not connection_string:
+            messages.error(self.request, "Azure Storage is not configured. Please contact an administrator.")
+            return self.form_invalid(form)
 
-        with tempfile.NamedTemporaryFile(mode="w+b", delete=True) as temp_file:
-            # Uploaded CSVs may contain characters with oddball Windows encodings.
-            # To overcome this, we need to decode the uploaded file content as UTF-8 (ignoring errors),
-            # re-encode the file, and then process that. Wasteful, but necessary to parse the CSV
-            # in a consistent fashion.
-            for chunk in form.cleaned_data["upload_file"].chunks():
-                temp_file.write(chunk.decode("utf-8", "ignore").encode())
-            temp_file.flush()
-            temp_file.seek(0)
+        blob_name = upload_file.name
 
-            # Extract the first row of the CSV for the purpose of validating the columns.
-            header_row = temp_file.readline()
-            header_row = header_row.decode()
-            in_file = StringIO(header_row)
-            temp_file.seek(0)
+        try:
+            blob_service = BlobServiceClient.from_connection_string(connection_string)
+            container_name = settings.AZURE_STORAGE_CONTAINER_NAME
+            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
+            # Stream the uploaded file directly to blob storage chunk by chunk to avoid
+            # loading the entire file into memory.
+            blob_client.upload_blob(upload_file, overwrite=True)
+        except Exception as e:
+            LOGGER.exception(f"Failed to upload blob {blob_name}: {e}")
+            messages.error(self.request, f"Upload failed: {blob_name}")
+            return self.form_invalid(form)
 
-            # Validate the uploaded file.
-            try:
-                validate_upload_file(in_file, file_type)
-            except Exception as e:
-                messages.warning(self.request, f"Error: {str(e)}")
-                return super().form_invalid(form)
-
-            # Upload may still not be valid data, but at least no exception was thrown.
-            try:
-                data_type = process_upload_file(temp_file.name, file_type, fy)
-                messages.success(self.request, f"{data_type} data imported successfully")
-            except Exception as e:
-                messages.warning(self.request, f"Error: {str(e)}")
-
-            return super().form_valid(form)
+        messages.success(self.request, f"File uploaded successfully ({blob_name}). Notification will be sent when processing is complete.")
+        # User email notifications (success/failure) take place in the task.
+        process_uploaded_csv.enqueue(blob_name, fy.financialYear, file_type, self.request.user.username)
+        return super(UploadView, self).form_valid(form)
 
 
 class DownloadView(IbmsFormView):
@@ -666,6 +660,7 @@ class DataAmendmentUpdate(RevisionMixin, UpdateView):
 
     def form_valid(self, form):
         obj = self.get_object()
+        obj.modifier = self.request.user
         messages.success(self.request, f"{obj.ibmIdentifier} ({obj.fy}) was amended successfully")
         set_comment(f"{obj.ibmIdentifier} ({obj.fy}) amended in the update form")
         # Find any matching GLPivDownload records and set the FK link.
@@ -712,70 +707,37 @@ class CodeUpdateCreateView(LoginRequiredMixin, CreateView):
         return self.render_to_response(context)
 
     def form_valid(self, form):
-        # Override a couple of form field values on save.
-        new_ibmdata = form.save(commit=False)
+        with create_revision():
+            # Override a couple of form field values on save.
+            new_ibmdata = form.save(commit=False)
+            new_ibmdata.modifier = self.request.user
 
-        # Uppercase the activity, project and job fields.
-        new_ibmdata.activity = new_ibmdata.activity.upper()
-        new_ibmdata.project = new_ibmdata.project.upper()
-        new_ibmdata.job = new_ibmdata.job.upper()
-        # Cast the account and service fields as string and left-pad them with zeroes.
-        new_ibmdata.account = str(new_ibmdata.account).zfill(2)
-        new_ibmdata.service = str(new_ibmdata.service).zfill(2)
-        # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
-        new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
+            # Uppercase the activity, project and job fields.
+            new_ibmdata.activity = new_ibmdata.activity.upper()
+            new_ibmdata.project = new_ibmdata.project.upper()
+            new_ibmdata.job = new_ibmdata.job.upper()
+            # Cast the account and service fields as string and left-pad them with zeroes.
+            new_ibmdata.account = str(new_ibmdata.account).zfill(2)
+            new_ibmdata.service = str(new_ibmdata.service).zfill(2)
+            # Construct the ibmIdentifier field value: XXX-XX-XX-XXX-XXXX-XXX (CC-ACC-SER-ACT-PRO-JOB).
+            new_ibmdata.ibmIdentifier = f"{new_ibmdata.costCentre}-{new_ibmdata.account}-{new_ibmdata.service}-{new_ibmdata.activity}-{new_ibmdata.project}-{new_ibmdata.job}"
 
-        # Short-circuit: if a matching IBMData record exists, return to that object view instead.
-        if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
-            existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
-            messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
-            return redirect(existing_ibmdata.get_absolute_url())
+            # Short-circuit: if a matching IBMData record exists, return to that object view instead.
+            if IBMData.objects.filter(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier).exists():
+                existing_ibmdata = IBMData.objects.get(fy=new_ibmdata.fy, ibmIdentifier=new_ibmdata.ibmIdentifier)
+                messages.info(self.request, f"IBM data {existing_ibmdata} already exists")
+                return redirect(existing_ibmdata.get_absolute_url())
 
-        new_ibmdata.save()
+            # Set revision metadata.
+            set_user(self.request.user)
+            set_comment(f"{new_ibmdata} created via code update form")
+            new_ibmdata.save()
+            self.object = new_ibmdata
+
         messages.success(self.request, f"IBM data {new_ibmdata} has been created")
 
         # Find any matching GLPivDownload records and set the FK link.
         for glpiv in GLPivDownload.objects.filter(fy=new_ibmdata.fy, codeID=new_ibmdata.ibmIdentifier, ibmdata__isnull=True):
             glpiv.save()
 
-        return super().form_valid(form)
-
-
-class BlobUploadView(UploadView):
-    """Extends UploadView to stream the uploaded CSV directly to Azure Blob Storage
-    instead of processing it locally. Requires the AZURE_STORAGE_CONNECTION_STRING
-    environment variable to be set. AZURE_STORAGE_CONTAINER_NAME must also be
-    defined in settings.
-    """
-
-    def get_success_url(self):
-        return reverse("ibms:blob_upload")
-
-    def form_valid(self, form):
-        fy = form.cleaned_data["financial_year"]
-        file_type = form.cleaned_data["upload_file_type"]
-        upload_file = form.cleaned_data["upload_file"]
-        connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        if not connection_string:
-            messages.error(self.request, "Azure Storage is not configured. Please contact an administrator.")
-            return self.form_invalid(form)
-
-        blob_name = upload_file.name
-
-        try:
-            blob_service = BlobServiceClient.from_connection_string(connection_string)
-            container_name = settings.AZURE_STORAGE_CONTAINER_NAME
-            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_name)
-            # Stream the uploaded file directly to blob storage chunk by chunk to avoid
-            # loading the entire file into memory.
-            blob_client.upload_blob(upload_file, overwrite=True)
-        except Exception as e:
-            LOGGER.exception(f"Failed to upload blob {blob_name}: {e}")
-            messages.error(self.request, f"Upload failed: {blob_name}")
-            return self.form_invalid(form)
-
-        messages.success(self.request, f"File uploaded successfully ({blob_name}). Notification will be sent when processing is complete.")
-        process_uploaded_csv.enqueue(blob_name, fy.financialYear, file_type, self.request.user.username)
-        # Skip UploadView.form_valid (which processes the file locally) and go straight
-        # to the redirect provided by FormView.form_valid.
-        return super(UploadView, self).form_valid(form)
+        return redirect(self.object.get_absolute_url())

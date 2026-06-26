@@ -6,8 +6,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
 
-from ibms_project.middleware import get_current_user
-
 User = get_user_model()
 
 
@@ -75,10 +73,6 @@ class IBMData(models.Model):
         return f"{self.fy} {self.ibmIdentifier}"
 
     def save(self, *args, **kwargs):
-        user = get_current_user()
-        if user:
-            self.modifier = user
-
         # Set the linked service priority object, if possible.
         if self.pk and not self.service_priority:
             sp = self.get_service_priority()

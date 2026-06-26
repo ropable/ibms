@@ -1,4 +1,4 @@
-{% extends "webtemplate_dbca/base_b5.html" %}
+{% extends "webtemplate_dbca/base.html" %}
 {% load static %}
 {% block extra_style %}
     <link rel="stylesheet"
@@ -87,9 +87,7 @@
                             </h5>
                             {% if superuser %}
                                 <li class="nav-item">
-                                    <a class="nav-link"
-                                       id="superuser_upload"
-                                       href="{% url 'ibms:blob_upload' %}">Upload</a>
+                                    <a class="nav-link" id="superuser_upload" href="{% url 'ibms:upload' %}">Upload</a>
                                 </li>
                             {% endif %}
                             <li class="nav-item">

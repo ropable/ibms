@@ -4,16 +4,18 @@ import io
 import os
 from contextlib import contextmanager
 from datetime import date, datetime
-from typing import Literal
+from typing import Literal, Optional, Sequence, Tuple
 
 from azure.storage.blob import BlobClient
 from django.conf import settings
-from reversion import create_revision, set_comment
+from django.contrib.auth.models import User
+from reversion import create_revision, set_comment, set_user
 
 from ibms.models import (
     CorporateStrategy,
     DepartmentProgram,
     ERServicePriority,
+    FinancialYear,
     GeneralServicePriority,
     GLPivDownload,
     IBMData,
@@ -23,7 +25,6 @@ from ibms.models import (
     ServicePriorityMapping,
     SFMServicePriority,
 )
-from sfm.models import FinancialYear
 
 
 class IBMSValidationError(Exception):
@@ -38,7 +39,13 @@ class FieldLengthError(IBMSValidationError):
     pass
 
 
-def get_download_period():
+class ColumnCountError(IBMSValidationError):
+    """The number of columns for a row does not match the required count"""
+
+    pass
+
+
+def get_download_period() -> date:
     """Return the 'newest' download_period date value for all the GLPivDownload objects."""
     if not GLPivDownload.objects.exists():
         return date.today()
@@ -47,19 +54,25 @@ def get_download_period():
     return GLPivDownload.objects.order_by("-download_period").first().download_period
 
 
-def validate_char_field(field_name, max_length, data):
+def validate_char_field(field_name: str, max_length: int, data: str) -> str:
     """For a passed-in string value, validate it doesn't exceed a maximum length."""
     if len(data.strip()) > max_length:
         raise FieldLengthError(f"Record for field {field_name} exceeds maximum length of {max_length}: got {data}")
     return data.strip()
 
 
-def validate_integer_field(field_name, data):
+def validate_integer_field(field_name: str, data: str) -> int:
     """Validate field is an integer"""
     try:
         return int(str(data).strip())
     except (ValueError, TypeError):
         raise IBMSValidationError(f"Record for field {field_name} must be an integer, got: {data}")
+
+
+def validate_column_count(row: Sequence, count: int) -> Literal[True]:
+    if len(row) != count:
+        raise ColumnCountError(f"Unexpected column count in row; expected {count}, received {len(row)}")
+    return True
 
 
 @contextmanager
@@ -113,9 +126,11 @@ def ibms_import_from_csv(
         | ERServicePriority
         | ServicePriorityMapping
     ],
-) -> tuple[str, int]:
+    user: Optional[User] = None,
+) -> Tuple:
     """Generic utility function to take a CSV source (file path or Azure BlobClient),
     a FinancialYear object and an IBMS model, and import that data (update existing or create new records).
+    Data validation is carried out during the import.
     """
     ctx = blobload_context(source) if isinstance(source, BlobClient) else csvload_context(source)
     return_str = None
@@ -123,6 +138,7 @@ def ibms_import_from_csv(
     with ctx as reader:
         if model == GLPivDownload:
             for row in reader:
+                _ = validate_column_count(row, 34)
                 record_count += 1
                 # NOTE: this branch differs from the others, in that it assumes a superuser will first clear existing
                 # GLPivDownload records for a given financial year.
@@ -172,6 +188,7 @@ def ibms_import_from_csv(
                 )
         elif model == IBMData:
             for row in reader:
+                _ = validate_column_count(row, 17)
                 record_count += 1
                 return_str = "IBM Data"
                 with create_revision():
@@ -193,8 +210,10 @@ def ibms_import_from_csv(
                         ibmdata.marineKPI = row[14]
                         ibmdata.regionProject = row[15]
                         ibmdata.regionDescription = row[16]
-                        ibmdata.save()
                         set_comment(f"{ibmdata} amended via upload")
+                        if user:
+                            set_user(user)
+                            ibmdata.modifier = user
                     else:
                         data = {
                             "fy": fy,
@@ -207,7 +226,7 @@ def ibms_import_from_csv(
                             "job": validate_char_field("job", 6, row[6]),
                             "budgetArea": validate_char_field("budgetArea", 50, row[7]),
                             "projectSponsor": validate_char_field("projectSponsor", 50, str(row[8])),
-                            "regionalSpecificInfo": row[9],
+                            "regionalSpecificInfo": str(row[9]),
                             "servicePriorityID": validate_char_field("servicePriorityID", 100, row[10]),
                             "annualWPInfo": str(row[11]),
                             "priorityActionNo": str(row[12]),
@@ -217,16 +236,23 @@ def ibms_import_from_csv(
                             "regionDescription": str(row[16]),
                         }
                         ibmdata = IBMData(**data)
+                        set_comment(f"{ibmdata} created via upload")
+                        if user:
+                            set_user(user)
+                            ibmdata.modifier = user
+                    ibmdata.save()
+
+                    # Repeat the save, in order to try setting the service priority on the object.
+                    # We can't set this before having a PK on the object, hence the conditional second save.
+                    if not ibmdata.service_priority:
                         ibmdata.save()
-                        # Repeat the save, in order to try setting the service priority on the object.
-                        # We can't set this before having a PK on the object.
-                        if not ibmdata.service_priority:
-                            ibmdata.save()
+
                 # Update any existing GLPivDownload objects that should now link to this object.
                 for glpiv in GLPivDownload.objects.filter(fy=fy, codeID=ibmdata.ibmIdentifier, ibmdata__isnull=True):
                     glpiv.save()
         elif model == CorporateStrategy:
             for row in reader:
+                _ = validate_column_count(row, 3)
                 record_count += 1
                 return_str = "IBMS Corporate Strategy"
                 data = {
@@ -239,6 +265,7 @@ def ibms_import_from_csv(
                 _, _ = CorporateStrategy.objects.update_or_create(defaults=data, **query)
         elif model == NCStrategicPlan:
             for row in reader:
+                _ = validate_column_count(row, 8)
                 record_count += 1
                 return_str = "Nature Conservation"
                 data = {
@@ -256,6 +283,7 @@ def ibms_import_from_csv(
                 _, _ = NCStrategicPlan.objects.update_or_create(defaults=data, **query)
         elif model == DepartmentProgram:
             for row in reader:
+                _ = validate_column_count(row, 4)
                 record_count += 1
                 data = {
                     "fy": fy,
@@ -271,6 +299,7 @@ def ibms_import_from_csv(
                     gl.save()  # Sets the FK link on save.
         elif model == GeneralServicePriority:
             for row in reader:
+                _ = validate_column_count(row, 6)
                 record_count += 1
                 data = {
                     "fy": fy,
@@ -285,6 +314,7 @@ def ibms_import_from_csv(
                 _, _ = GeneralServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == NCServicePriority:
             for row in reader:
+                _ = validate_column_count(row, 12)
                 record_count += 1
                 return_str = "Nature Conservation Service Priority"
                 data = {
@@ -306,6 +336,7 @@ def ibms_import_from_csv(
                 _, _ = NCServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == PVSServicePriority:
             for row in reader:
+                _ = validate_column_count(row, 8)
                 record_count += 1
                 return_str = "Parks & Visitor Services Service Priority"
                 data = {
@@ -323,6 +354,7 @@ def ibms_import_from_csv(
                 _, _ = PVSServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == SFMServicePriority:
             for row in reader:
+                _ = validate_column_count(row, 7)
                 record_count += 1
                 return_str = "Forest Management Service Priority"
                 data = {
@@ -339,6 +371,7 @@ def ibms_import_from_csv(
                 _, _ = SFMServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == ERServicePriority:
             for row in reader:
+                _ = validate_column_count(row, 6)
                 record_count += 1
                 return_str = "Fire Services Service Priority"
                 data = {
@@ -354,6 +387,7 @@ def ibms_import_from_csv(
                 _, _ = ERServicePriority.objects.update_or_create(defaults=data, **query)
         elif model == ServicePriorityMapping:
             for row in reader:
+                _ = validate_column_count(row, 4)
                 record_count += 1
                 return_str = "Service Priority Mapping"
                 data = {
@@ -369,254 +403,6 @@ def ibms_import_from_csv(
         return model._meta.verbose_name.capitalize(), record_count
     else:
         return return_str, record_count
-
-
-def validate_headers(row, valid_count, headings) -> Literal[True]:
-    """For a passed-in CSV row, validate the count and content of each column.
-    Raises an exception on failure, otherwise returns True."""
-    column_count = len(row)
-    if column_count == valid_count:  # Correct number of columns.
-        # Check column headings.
-        bad_headings = ""
-        for k, heading in enumerate(headings):
-            # If the given heading value doesn't match, append it to the error message.
-            if row[k].strip().upper() != heading.upper():
-                bad_headings += f"{row[k]} does not match {heading}\n"
-
-        if bad_headings:
-            raise IBMSValidationError(f"""The column headings in the CSV file do not match the required headings:\n
-                            {bad_headings}""")
-
-    else:  # Incorrect number of columns
-        raise IBMSValidationError(f"""The number of columns in the CSV file do not match the required column count:\n
-                        expected {valid_count}, received {column_count}""")
-
-    return True
-
-
-def validate_upload_file(in_file, file_type) -> Literal[True]:
-    """Utility function called by the Upload view to validate uploaded files.
-    Returns True or raises an exception.
-    """
-    reader = csv.reader(in_file, dialect="excel")
-    row = next(reader)  # Get the first (header) row.
-
-    if file_type == "gl_pivot_download":
-        return validate_headers(
-            row,
-            valid_count=34,
-            headings=[
-                "Download Period",
-                "CC",
-                "Account",
-                "Service",
-                "Activity",
-                "Resource",
-                "Project",
-                "Job",
-                "Shortcode",
-                "Shortcode_Name",
-                "GL_Code",
-                "PTD_Actual",
-                "PTD_Budget",
-                "YTD_Actual",
-                "YTD_Budget",
-                "FY_Budget",
-                "YTD_Variance",
-                "CC_Name",
-                "Service Name",
-                "Activity_Name",
-                "Resource_Name",
-                "Project_Name",
-                "Job_Name",
-                "Code identifier",
-                "ResNmNo",
-                "ActNmNo",
-                "ProjNmNo",
-                "Region/Branch",
-                "Division",
-                "Resource Category",
-                "Wildfire",
-                "Exp_Rev",
-                "Fire Activities",
-                "MPRA Category",
-            ],
-        )
-    elif file_type == "ibm_data":
-        return validate_headers(
-            row,
-            valid_count=17,
-            headings=[
-                "ibmIdentifier",
-                "costCentre",
-                "account",
-                "service",
-                "activity",
-                "project",
-                "job",
-                "budgetArea",
-                "projectSponsor",
-                "regionalSpecificInfo",
-                "servicePriorityID",
-                "annualWPInfo",
-                "priorityActionNo",
-                "priorityLevel",
-                "marineKPI",
-                "regionProject",
-                "regionDescription",
-            ],
-        )
-    elif file_type == "corp_strategy":
-        return validate_headers(
-            row,
-            valid_count=3,
-            headings=["IBMSCSNo", "IBMSCSDesc1", "IBMSCSDesc2"],
-        )
-    elif file_type == "nature_conservation":
-        return validate_headers(
-            row,
-            valid_count=8,
-            headings=[
-                "StratPlanNo",
-                "StratDirNo",
-                "StratDir",
-                "aimNo",
-                "aim1",
-                "aim2",
-                "actNo",
-                "action",
-            ],
-        )
-    elif file_type == "dept_program":
-        return validate_headers(
-            row,
-            valid_count=4,
-            headings=[
-                "ibmIdentifier",
-                "DeptProgram1",
-                "DeptProgram2",
-                "DeptProgram3",
-            ],
-        )
-    elif file_type == "er_sp":
-        return validate_headers(
-            row,
-            valid_count=6,
-            headings=[
-                "CategoryID",
-                "SerPriNo",
-                "StratPlanNo",
-                "IBMCS",
-                "Env Regs Specific Classification",
-                "Env Regs Specific Description",
-            ],
-        )
-    elif file_type == "pvs_sp":
-        return validate_headers(
-            row,
-            valid_count=8,
-            headings=[
-                "CategoryID",
-                "SerPriNo",
-                "StratPlanNo",
-                "IBMCS",
-                "SerPri1",
-                "SerPri",
-                "PVSExampleAnnWP",
-                "PVSExampleActNo",
-            ],
-        )
-    elif file_type == "sfm_sp":
-        return validate_headers(
-            row,
-            valid_count=7,
-            headings=[
-                "CategoryID",
-                "Region",
-                "SerPriNo",
-                "StratPlanNo",
-                "IBMCS",
-                "SerPri1",
-                "SerPri2",
-            ],
-        )
-    elif file_type == "general_sp":
-        return validate_headers(
-            row,
-            valid_count=6,
-            headings=[
-                "CategoryID",
-                "SerPriNo",
-                "StratPlanNo",
-                "IBMCS",
-                "Description 1",
-                "Description 2",
-            ],
-        )
-    elif file_type == "nc_sp":
-        return validate_headers(
-            row,
-            valid_count=12,
-            headings=[
-                "CategoryID",
-                "SerPriNo",
-                "StratPlanNo",
-                "IBMCS",
-                "AssetNo",
-                "Asset",
-                "TargetNo",
-                "Target",
-                "ActionNo",
-                "Action",
-                "MileNo",
-                "Milestone",
-            ],
-        )
-    elif file_type == "service_priority_mapping":
-        return validate_headers(
-            row,
-            valid_count=4,
-            headings=[
-                "costCentreNo",
-                "wildlifeManagement",
-                "parksManagement",
-                "forestManagement",
-            ],
-        )
-
-    else:
-        raise IBMSValidationError(f"Unknown file type {file_type}")
-
-
-def process_upload_file(file_name, file_type, fy) -> str:
-    """Utility function called by the Upload view to process an uploaded CSV file.
-    Returns the type of data generated by the import."""
-    if file_type == "gl_pivot_download":
-        data_type = ibms_import_from_csv(file_name, fy, GLPivDownload)
-    elif file_type == "ibm_data":
-        data_type = ibms_import_from_csv(file_name, fy, IBMData)
-    elif file_type == "corp_strategy":
-        data_type = ibms_import_from_csv(file_name, fy, CorporateStrategy)
-    elif file_type == "nature_conservation":
-        data_type = ibms_import_from_csv(file_name, fy, NCStrategicPlan)
-    elif file_type == "dept_program":
-        data_type = ibms_import_from_csv(file_name, fy, DepartmentProgram)
-    elif file_type == "general_sp":
-        data_type = ibms_import_from_csv(file_name, fy, GeneralServicePriority)
-    elif file_type == "nc_sp":
-        data_type = ibms_import_from_csv(file_name, fy, NCServicePriority)
-    elif file_type == "pvs_sp":
-        data_type = ibms_import_from_csv(file_name, fy, PVSServicePriority)
-    elif file_type == "sfm_sp":
-        data_type = ibms_import_from_csv(file_name, fy, SFMServicePriority)
-    elif file_type == "er_sp":
-        data_type = ibms_import_from_csv(file_name, fy, ERServicePriority)
-    elif file_type == "service_priority_mapping":
-        data_type = ibms_import_from_csv(file_name, fy, ServicePriorityMapping)
-    else:
-        raise Exception(f"process_upload_file : file type {file_type} unknown")
-
-    return data_type
 
 
 def upload_file(source_path, container_name, conn_str, overwrite=True, blob_name=None, logger=None):
