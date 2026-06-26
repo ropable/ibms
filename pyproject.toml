@@ -32,13 +32,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ipython>=9.14.0",
+  "ipython>=9.14.1",
   "ipdb>=0.13.13",
   "mixer>=7.2.2",
   "faker>=12.0.1",
   "pre-commit>=4.6.0",
   "coverage>=7.14.3",
-  "django-stubs>=6.0.5",
+  "django-stubs>=6.0.6",
   "deptry>=0.25.1",
 ]
 
