@@ -17,7 +17,8 @@ permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never let a scheduled run cancel an in-flight push build.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
   GHCR_IMAGE: ghcr.io/${{ github.repository }}
@@ -86,12 +87,14 @@ jobs:
           push: true
           set: |
             app.tags=${{ env.GHCR_IMAGE }}:latest
+            app.cache-from=type=gha
+            app.cache-to=type=gha,mode=max
             ${{ steps.image_tag.outputs.has_version_tag == 'true' && format('app.tags={0}:{1}', env.GHCR_IMAGE, steps.image_tag.outputs.value) || '' }}
 
   scan:
     name: Docker image vulnerability scan
-    continue-on-error: true # If vulnerability scan fails, the workflow can still complete successfully.
     runs-on: ubuntu-latest
+    continue-on-error: true # If vulnerability scan fails, the workflow can still complete successfully.
     needs:
       - build
     permissions:
