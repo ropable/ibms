@@ -3,6 +3,7 @@ Dockerfile*
 .env
 .env.*
 .git*
+.github/
 .pyc
 .py[cod]
 *.pyo
@@ -26,7 +27,6 @@ kustomize/
 .vscode/
 .idea/
 .DS_Store
-Dockerfile
 LICENSE
 README.md
 logs/
