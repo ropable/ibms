@@ -13,6 +13,13 @@ __pycache__/
 .mypy_cache/
 .coverage
 htmlcov/
+.venv/
+.artifacts/
+docker-bake.hcl
+.pre-commit-config.yaml
+SECURITY.md
+docs/
+kustomize/
 *.log
 *.sqlite3
 *.db
