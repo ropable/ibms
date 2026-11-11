@@ -65,9 +65,9 @@ native platform and load it into Docker:
 
 Run the image locally in a container like so:
 
-    docker container run --rm --env-file .env ghcr.io/dbca-wa/ibms:local
+    docker container run --rm -p 8080:8080 --env-file .env ghcr.io/dbca-wa/ibms:dev
 
-To build and push the multi-arch image yourself:
+To build and push a multi-arch image manually (without waiting for CI, requires `--push`):
 
     TAG=v1.2.3 docker buildx bake --push app
 

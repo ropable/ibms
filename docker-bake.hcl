@@ -1,9 +1,11 @@
 # docker-bake.hcl — reproducible, multi-arch build config.
-# Build (local, native platform, loaded into Docker): docker buildx bake local
-# Build + push (multi-arch):                          docker buildx bake --push app
-# Override at runtime:   TAG=v2 IMAGE=ghcr.io/me/ibms docker buildx bake local
-# Override the base tag: PYTHON_VERSION=3.14 docker buildx bake local
-# CI builds the "ci" target (see .github/workflows/multi-build.yml).
+# Build (local, native platform, tagged :dev):  docker buildx bake local
+# Build + push (multi-arch):                    docker buildx bake --push app
+#                                                (needs a docker-container builder)
+# Override variables at build time:             LOCAL_TAG=local IMAGE=ghcr.io/me/project docker buildx bake local
+# Multi-arch with overrides:                    IMAGE=ghcr.io/me/project PLATFORMS=linux/arm64 docker buildx bake --push app
+# Override a Dockerfile ARG:                    docker buildx bake --set app.args.PYTHON_VERSION=3.14-debian13-dev
+# GitHub CI builds the "ci" target (see .github/workflows/multi-build.yml).
 
 variable "IMAGE" {
   description = "Fully-qualified image name, without the tag."
@@ -11,13 +13,13 @@ variable "IMAGE" {
 }
 
 variable "TAG" {
-  description = "Tag applied to the built image."
+  description = "Tag applied by the app/ci build targets."
   default     = "latest"
 }
 
-variable "PYTHON_VERSION" {
-  description = "dhi.io/python image tag used by the Dockerfile."
-  default     = "3.13-debian13-dev"
+variable "LOCAL_TAG" {
+  description = "Tag for a local development image."
+  default     = "dev"
 }
 
 variable "PLATFORMS" {
@@ -35,30 +37,33 @@ group "default" {
 target "_base" {
   context    = "."
   dockerfile = "Dockerfile"
-  args       = { PYTHON_VERSION = PYTHON_VERSION }
 }
 
-# Multi-arch image for the registry (manual release push or CI).
+# Local development: native platform, loaded into Docker, tagged :dev (default).
+# No `platforms`: BuildKit builds for the builder's host platform,
+# so the image always matches the machine running the build.
+target "local" {
+  inherits = ["_base"]
+  tags     = ["${IMAGE}:${LOCAL_TAG}"]
+  output   = ["type=docker"]
+}
+
+# Multi-arch image for the registry (manual release build & push or CI).
+# Push-only target.
 target "app" {
   inherits  = ["_base"]
   tags      = ["${IMAGE}:${TAG}"]
   platforms = PLATFORMS
-  # Only attached on push; the docker exporter ignores these.
+  # Provenance + SBOM; attached on push (CI needs attestations + id-token permissions).
   attest    = ["type=provenance,mode=max", "type=sbom"]
 }
 
-# CI-only: GitHub Actions cache, and always refresh base images so the
-# scheduled rebuild actually picks up upstream security fixes.
+# CI-only: GitHub Actions cache, and always refresh base images so any
+# scheduled rebuild picks up upstream security fixes.
+# Note that CI overrides tags in multi-build.yml via set: ci.tags=...
 target "ci" {
   inherits   = ["app"]
   cache-from = ["type=gha"]
   cache-to   = ["type=gha,mode=max"]
   pull       = true
-}
-
-# Local development: native platform, loaded straight into Docker.
-target "local" {
-  inherits = ["_base"]
-  tags     = ["${IMAGE}:local"]
-  output   = ["type=docker"]
 }
